@@ -76,10 +76,9 @@ export function countWords(text: string): number {
   return trimmed ? trimmed.split(/\s+/).length : 0;
 }
 
+/** Stessi personaggi, in qualsiasi ordine (sono sempre pochi: niente Set). */
 export function sameSpeakers(a: string[], b: string[]): boolean {
-  if (a.length !== b.length) return false;
-  const set = new Set(a);
-  return b.every((id) => set.has(id));
+  return a === b || (a.length === b.length && b.every((id) => a.includes(id)));
 }
 
 export function uid(): string {

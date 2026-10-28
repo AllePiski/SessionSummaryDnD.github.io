@@ -130,10 +130,14 @@ export function SpeakerTimeline({
           aria-valuemin={0}
           aria-valuemax={Math.round(duration / 1000)}
           aria-valuenow={Math.round(currentMs / 1000)}
+          aria-valuetext={`${formatClock(currentMs)} di ${formatClock(duration)}`}
+          aria-disabled={!ready}
           tabIndex={0}
           onKeyDown={(e) => {
-            if (e.key === "ArrowRight") seek(currentMs + 10_000);
-            if (e.key === "ArrowLeft") seek(currentMs - 10_000);
+            const target = { ArrowRight: currentMs + 10_000, ArrowLeft: currentMs - 10_000, Home: 0, End: duration }[e.key];
+            if (target === undefined) return;
+            e.preventDefault();
+            seek(target);
           }}
         >
           {ticks.map((t) => (

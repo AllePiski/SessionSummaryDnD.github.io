@@ -160,13 +160,24 @@ export async function updateSessionInfo(id: string, patch: Pick<Partial<Session>
   await db.sessions.update(id, { ...patch, updatedAt: Date.now() });
 }
 
-/** Modifica le frasi della sceneggiatura in modo atomico. */
-async function editLines(id: string, edit: (session: Session) => Partial<Session>) {
-  await db.transaction("rw", db.sessions, async () => {
+/** Contenuto modificabile di una sessione, per poter annullare una modifica. */
+export type SessionContent = Pick<Session, "lines" | "turns" | "participantIds">;
+
+/**
+ * Modifica battute e turni in modo atomico e restituisce com'erano prima
+ * (da passare a `restoreSessionContent` per annullare).
+ */
+async function editLines(id: string, edit: (session: Session) => Partial<Session>): Promise<SessionContent | null> {
+  return db.transaction("rw", db.sessions, async () => {
     const session = await db.sessions.get(id);
-    if (!session) return;
+    if (!session) return null;
     await db.sessions.update(id, { ...edit(session), updatedAt: Date.now() });
+    return { lines: session.lines, turns: session.turns, participantIds: session.participantIds };
   });
+}
+
+export async function restoreSessionContent(id: string, content: SessionContent) {
+  await db.sessions.update(id, { ...content, updatedAt: Date.now() });
 }
 
 export function setLineText(sessionId: string, lineId: string, text: string) {

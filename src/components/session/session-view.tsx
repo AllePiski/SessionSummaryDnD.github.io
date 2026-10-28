@@ -12,7 +12,7 @@ import { Switch } from "@/components/ui/switch";
 import { PageLoading } from "@/components/page-header";
 import { StatTile } from "@/components/stat-tile";
 import { NotesCard } from "./notes-card";
-import { PlayerControls, PlayerProvider } from "./player";
+import { MiniPlayer, PlayerControls, PlayerProvider, usePlayerState } from "./player";
 import { SavedDialog } from "./saved-dialog";
 import { ScreenplayView } from "./screenplay-view";
 import { SessionHeader } from "./session-header";
@@ -21,7 +21,7 @@ import { TalkTime } from "./talk-time";
 import { useCharacterMap, useSession, useSessionAudio } from "@/hooks/use-data";
 import { audioFileName, saveBlob } from "@/lib/audio";
 import { countWords, formatBytes, formatDuration, plural } from "@/lib/format";
-import { speakerStats } from "@/lib/screenplay";
+import { speakerNames, speakerStats } from "@/lib/screenplay";
 import type { Character, Session } from "@/lib/types";
 
 /** Pagina di una sessione: l'id arriva da ?id=… (le sessioni vivono nel browser). */
@@ -81,7 +81,7 @@ function SessionDashboard({
   }
 
   return (
-    <div className="mx-auto grid max-w-7xl gap-6">
+    <div className="mx-auto grid max-w-7xl grid-cols-[minmax(0,1fr)] gap-6">
       <SessionHeader
         session={session}
         characters={characters}
@@ -157,6 +157,8 @@ function SessionDashboard({
         </div>
       </div>
 
+      <SessionMiniPlayer session={session} characters={characters} />
+
       <SavedDialog
         open={isNew}
         session={session}
@@ -166,4 +168,11 @@ function SessionDashboard({
       />
     </div>
   );
+}
+
+/** Mini-player con il nome di chi parla nel punto in ascolto. */
+function SessionMiniPlayer({ session, characters }: { session: Session; characters: Map<string, Character> }) {
+  const { currentMs } = usePlayerState();
+  const turn = session.turns.find((t) => currentMs >= t.start && currentMs < t.end);
+  return <MiniPlayer label={turn ? speakerNames(turn.speakerIds, characters) : undefined} />;
 }

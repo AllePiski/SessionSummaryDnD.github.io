@@ -8,6 +8,8 @@ export interface ScreenplayEntry {
   speakerIds: string[];
   /** id della frase salvata; assente per i turni senza trascrizione */
   lineId?: string;
+  /** solo per i turni senza testo: quanto è durato il turno */
+  durationMs?: number;
 }
 
 export interface ScreenplayBlock {
@@ -35,13 +37,25 @@ export function buildScreenplay(session: Session): ScreenplayBlock[] {
     lineId: l.id,
   }));
 
+  // righe ordinate per tempo: per ogni turno si cercano solo quelle nel suo intervallo
+  const lines = [...session.lines].sort((a, b) => a.t - b.t);
   for (const turn of session.turns) {
     if (turn.end - turn.start < MIN_SILENT_TURN_MS) continue;
-    const covered = session.lines.some(
-      (l) => l.t >= turn.start - 1000 && l.t < turn.end && sameSpeakers(l.speakerIds, turn.speakerIds),
-    );
+    let covered = false;
+    for (let i = firstLineFrom(lines, turn.start - 1000); i < lines.length && lines[i].t < turn.end; i++) {
+      if (sameSpeakers(lines[i].speakerIds, turn.speakerIds)) {
+        covered = true;
+        break;
+      }
+    }
     if (!covered) {
-      entries.push({ key: `turn-${turn.start}`, t: turn.start, text: "", speakerIds: turn.speakerIds });
+      entries.push({
+        key: `turn-${turn.start}`,
+        t: turn.start,
+        text: "",
+        speakerIds: turn.speakerIds,
+        durationMs: turn.end - turn.start,
+      });
     }
   }
 
@@ -60,6 +74,18 @@ export function buildScreenplay(session: Session): ScreenplayBlock[] {
     block.end = blocks[i + 1]?.start ?? Math.max(session.durationMs, block.start);
   });
   return blocks;
+}
+
+/** Indice della prima riga con t >= from (ricerca binaria). */
+function firstLineFrom(lines: { t: number }[], from: number): number {
+  let lo = 0;
+  let hi = lines.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (lines[mid].t < from) lo = mid + 1;
+    else hi = mid;
+  }
+  return lo;
 }
 
 export function speakerNames(ids: string[], characters: Map<string, Character>): string {

@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { CharacterAvatar } from "@/components/avatars/character-avatar";
 import { D20Logo } from "@/components/app-shell";
+import { DiceRoller } from "@/components/dice/dice-roller";
 import { PageLoading } from "@/components/page-header";
 import { ElapsedTime } from "@/components/record/elapsed-time";
 import { SessionRow } from "@/components/sessions/sessions-view";
@@ -136,6 +137,8 @@ export function DashboardView() {
           detail={totals.last?.title}
         />
       </div>
+
+      <DiceRoller />
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
         <Card>

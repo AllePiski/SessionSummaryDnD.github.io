@@ -6,6 +6,9 @@ export type DieSides = (typeof DIE_SIDES)[number];
 export const MAX_DICE_PER_GROUP = 20;
 export const MAX_GROUPS = 8;
 
+/** Vantaggio/svantaggio: ogni d20 si tira due volte e si tiene il più alto/basso. */
+export type RollMode = "normal" | "advantage" | "disadvantage";
+
 /** Un gruppo di dadi uguali con uno scopo opzionale (es. "2d8 Fuoco +3"). */
 export interface DiceGroup {
   id: string;
@@ -14,6 +17,8 @@ export interface DiceGroup {
   /** a cosa serve il tiro: tipo di danno, attacco, tiro salvezza… */
   label: string;
   modifier: number;
+  /** vale solo per i d20 (assente nei gruppi salvati prima di questa opzione) */
+  mode?: RollMode;
 }
 
 export interface GroupResult {
@@ -23,7 +28,11 @@ export interface GroupResult {
   label: string;
   modifier: number;
   color: string;
+  mode: RollMode;
+  /** valori tenuti (uno per dado) */
   values: number[];
+  /** con vantaggio/svantaggio: il secondo tiro scartato, per ogni dado */
+  discarded?: number[];
   subtotal: number;
 }
 
@@ -84,9 +93,20 @@ export function groupColor(label: string, index: number): string {
   return GROUP_COLORS[index % GROUP_COLORS.length];
 }
 
-export function newGroup(sides: DieSides = 20, count = 1): DiceGroup {
-  return { id: uid(), count, sides, label: "", modifier: 0 };
+export function newGroup(sides: DieSides = 20, count = 1, mode: RollMode = "normal"): DiceGroup {
+  return { id: uid(), count, sides, label: "", modifier: 0, mode };
 }
+
+/** La modalità conta solo per i d20. */
+export function effectiveMode(g: Pick<DiceGroup, "sides" | "mode">): RollMode {
+  return g.sides === 20 ? (g.mode ?? "normal") : "normal";
+}
+
+export const MODE_LABELS: Record<RollMode, string> = {
+  normal: "Normale",
+  advantage: "Vantaggio",
+  disadvantage: "Svantaggio",
+};
 
 /** Intero casuale 1..sides senza distorsione (crypto + rifiuto dei valori in eccesso). */
 export function rollDie(sides: number): number {
@@ -101,8 +121,21 @@ export function rollDie(sides: number): number {
 }
 
 export function rollGroups(groups: DiceGroup[]): RollResult {
-  const results = groups.map((g, i) => {
-    const values = Array.from({ length: g.count }, () => rollDie(g.sides));
+  const results = groups.map((g, i): GroupResult => {
+    const mode = effectiveMode(g);
+    const values: number[] = [];
+    const discarded: number[] = [];
+    for (let n = 0; n < g.count; n++) {
+      const first = rollDie(g.sides);
+      if (mode === "normal") {
+        values.push(first);
+        continue;
+      }
+      const second = rollDie(g.sides);
+      const keepFirst = mode === "advantage" ? first >= second : first <= second;
+      values.push(keepFirst ? first : second);
+      discarded.push(keepFirst ? second : first);
+    }
     return {
       groupId: g.id,
       count: g.count,
@@ -110,7 +143,9 @@ export function rollGroups(groups: DiceGroup[]): RollResult {
       label: g.label.trim(),
       modifier: g.modifier,
       color: groupColor(g.label, i),
+      mode,
       values,
+      discarded: mode === "normal" ? undefined : discarded,
       subtotal: values.reduce((a, b) => a + b, 0) + g.modifier,
     };
   });
@@ -121,10 +156,16 @@ function signed(n: number): string {
   return n > 0 ? ` + ${n}` : n < 0 ? ` − ${Math.abs(n)}` : "";
 }
 
-/** "1d8 Fuoco + 1d8 Ghiaccio + 2d6 + 3" */
-export function formatFormula(groups: Pick<DiceGroup, "count" | "sides" | "label" | "modifier">[]): string {
+const MODE_SUFFIX: Record<RollMode, string> = { normal: "", advantage: " (vantaggio)", disadvantage: " (svantaggio)" };
+
+/** "1d20 (vantaggio) Attacco + 5 + 1d8 Fuoco" */
+export function formatFormula(groups: Pick<DiceGroup, "count" | "sides" | "label" | "modifier" | "mode">[]): string {
   return groups
-    .map((g, i) => `${i > 0 ? " + " : ""}${g.count}d${g.sides}${g.label.trim() ? ` ${g.label.trim()}` : ""}${signed(g.modifier)}`)
+    .map(
+      (g, i) =>
+        `${i > 0 ? " + " : ""}${g.count}d${g.sides}${MODE_SUFFIX[effectiveMode(g)]}` +
+        `${g.label.trim() ? ` ${g.label.trim()}` : ""}${signed(g.modifier)}`,
+    )
     .join("");
 }
 

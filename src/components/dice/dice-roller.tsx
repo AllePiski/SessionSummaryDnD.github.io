@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
-import { Dices, History, Minus, Plus, RotateCcw, Trash2, X } from "lucide-react";
+import { ChevronsDown, ChevronsUp, Dices, History, Minus, Plus, RotateCcw, Trash2, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,7 +14,9 @@ import {
   DIE_SIDES,
   MAX_DICE_PER_GROUP,
   MAX_GROUPS,
+  MODE_LABELS,
   ROLL_PURPOSES,
+  effectiveMode,
   formatFormula,
   groupColor,
   newGroup,
@@ -22,6 +24,7 @@ import {
   totalsByPurpose,
   type DiceGroup,
   type DieSides,
+  type RollMode,
   type RollResult,
 } from "@/lib/dice";
 import { setSetting } from "@/lib/repo";
@@ -43,6 +46,8 @@ interface PlannedDie {
   delay: number;
   duration: number;
   highlight?: "max" | "min";
+  /** tiro scartato per vantaggio/svantaggio */
+  discarded?: boolean;
 }
 
 /** Sezione della dashboard per tirare i dadi, anche misti e con uno scopo per gruppo. */
@@ -62,21 +67,32 @@ export function DiceRoller() {
 
 function plan(roll: RollResult, animate: boolean): PlannedDie[] {
   const dice: PlannedDie[] = [];
+  const push = (key: string, sides: number, value: number, color: string, extra: Partial<PlannedDie>) => {
+    const n = dice.length;
+    dice.push({
+      key,
+      sides,
+      value,
+      color,
+      delay: animate ? Math.min(n * 55, 650) : 0,
+      duration: animate ? 950 + Math.random() * 350 : 0,
+      ...extra,
+    });
+  };
   roll.groups.forEach((g) =>
     g.values.forEach((value, i) => {
-      const n = dice.length;
-      dice.push({
-        key: `${g.groupId}-${i}`,
-        sides: g.sides,
-        value,
-        color: g.color,
-        delay: animate ? Math.min(n * 55, 650) : 0,
-        duration: animate ? 950 + Math.random() * 350 : 0,
-        highlight: g.sides === 20 ? (value === 20 ? "max" : value === 1 ? "min" : undefined) : undefined,
-      });
+      const highlight = g.sides === 20 ? (value === 20 ? "max" : value === 1 ? "min" : undefined) : undefined;
+      push(`${g.groupId}-${i}`, g.sides, value, g.color, { highlight });
+      const other = g.discarded?.[i];
+      if (other !== undefined) push(`${g.groupId}-${i}-x`, g.sides, other, g.color, { discarded: true });
     }),
   );
   return dice;
+}
+
+/** Dadi fisici sul tappeto: con vantaggio/svantaggio ogni d20 vale doppio. */
+function physicalDice(g: DiceGroup) {
+  return g.count * (effectiveMode(g) === "normal" ? 1 : 2);
 }
 
 function diceSize(count: number) {
@@ -109,24 +125,37 @@ function DiceRollerBody({ initialGroups, initialHistory }: { initialGroups: Dice
     [],
   );
 
-  const totalDice = groups.reduce((sum, g) => sum + g.count, 0);
+  const totalDice = groups.reduce((sum, g) => sum + physicalDice(g), 0);
 
   function update(id: string, patch: Partial<DiceGroup>) {
     setGroups((gs) => gs.map((g) => (g.id === id ? { ...g, ...patch } : g)));
   }
 
-  function addDie(sides: DieSides) {
+  function addDie(sides: DieSides, mode: RollMode = "normal") {
     setGroups((gs) => {
       const last = gs.at(-1);
-      if (last && last.sides === sides && !last.label.trim() && last.modifier === 0 && last.count < MAX_DICE_PER_GROUP) {
+      if (
+        last &&
+        last.sides === sides &&
+        effectiveMode(last) === mode &&
+        !last.label.trim() &&
+        last.modifier === 0 &&
+        last.count < MAX_DICE_PER_GROUP
+      ) {
         return gs.map((g) => (g === last ? { ...g, count: g.count + 1 } : g));
       }
       if (gs.length >= MAX_GROUPS) return gs;
       // un d20 "vuoto" di partenza viene sostituito dal primo dado scelto
-      if (gs.length === 1 && gs[0].count === 1 && gs[0].sides === 20 && !gs[0].label && !gs[0].modifier && !roll) {
-        return [newGroup(sides)];
-      }
-      return [...gs, newGroup(sides)];
+      const first = gs[0];
+      const pristine =
+        gs.length === 1 &&
+        first.count === 1 &&
+        first.sides === 20 &&
+        effectiveMode(first) === "normal" &&
+        !first.label &&
+        !first.modifier;
+      if (pristine && !roll) return [newGroup(sides, 1, mode)];
+      return [...gs, newGroup(sides, 1, mode)];
     });
   }
 
@@ -152,7 +181,11 @@ function DiceRollerBody({ initialGroups, initialHistory }: { initialGroups: Dice
   }
 
   function repeat(past: RollResult) {
-    const next = past.groups.map((g) => ({ ...newGroup(g.sides, g.count), label: g.label, modifier: g.modifier }));
+    const next = past.groups.map((g) => ({
+      ...newGroup(g.sides, g.count, g.mode ?? "normal"),
+      label: g.label,
+      modifier: g.modifier,
+    }));
     setGroups(next);
     doRoll(next);
   }
@@ -186,6 +219,24 @@ function DiceRollerBody({ initialGroups, initialHistory }: { initialGroups: Dice
                 <DieFace sides={sides} value={null} color="var(--muted-foreground)" icon className="size-6" />d{sides}
               </Button>
             ))}
+            <Button
+              type="button"
+              variant="outline"
+              className="h-10 gap-1 px-2"
+              onClick={() => addDie(20, "advantage")}
+              title="Tira 2d20 e tieni il più alto"
+            >
+              <ChevronsUp className="text-[#0ca30c]" /> d20 Vantaggio
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              className="h-10 gap-1 px-2"
+              onClick={() => addDie(20, "disadvantage")}
+              title="Tira 2d20 e tieni il più basso"
+            >
+              <ChevronsDown className="text-[#d03b3b]" /> d20 Svantaggio
+            </Button>
           </div>
 
           <form
@@ -248,11 +299,12 @@ function DiceRollerBody({ initialGroups, initialHistory }: { initialGroups: Dice
                     delay={d.delay}
                     duration={d.duration}
                     highlight={d.highlight}
+                    discarded={d.discarded}
                     className={size}
                   />
                 ))
               : groups.flatMap((g, gi) =>
-                  Array.from({ length: g.count }, (_, i) => (
+                  Array.from({ length: physicalDice(g) }, (_, i) => (
                     <DieFace
                       key={`${g.id}-${i}`}
                       sides={g.sides}
@@ -341,6 +393,20 @@ function GroupRow({
           ))}
         </SelectContent>
       </Select>
+      {group.sides === 20 && (
+        <Select value={effectiveMode(group)} onValueChange={(v) => onChange({ mode: v as RollMode })}>
+          <SelectTrigger className="w-32" aria-label="Vantaggio o svantaggio">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {(Object.keys(MODE_LABELS) as RollMode[]).map((m) => (
+              <SelectItem key={m} value={m}>
+                {MODE_LABELS[m]}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      )}
       <Input
         list="dice-purposes"
         value={group.label}
@@ -399,9 +465,27 @@ function RollSummary({ roll }: { roll: RollResult }) {
                   {g.count}d{g.sides}
                   {g.label && ` ${g.label}`}
                 </span>
+                {g.mode !== "normal" && (
+                  <Badge variant="outline" className="h-5 gap-0.5">
+                    {g.mode === "advantage" ? <ChevronsUp className="text-[#0ca30c]" /> : <ChevronsDown className="text-[#d03b3b]" />}
+                    {MODE_LABELS[g.mode]}
+                  </Badge>
+                )}
                 <span className="text-muted-foreground tabular">
-                  [{g.values.join(", ")}]
-                  {g.modifier !== 0 && ` ${g.modifier > 0 ? "+" : "−"} ${Math.abs(g.modifier)}`}
+                  [
+                  {g.values.map((v, i) => (
+                    <span key={i}>
+                      {i > 0 && ", "}
+                      <span className="text-foreground">{v}</span>
+                      {g.discarded?.[i] !== undefined && (
+                        <span className="line-through opacity-70" title="Tiro scartato">
+                          {" "}
+                          {g.discarded[i]}
+                        </span>
+                      )}
+                    </span>
+                  ))}
+                  ]{g.modifier !== 0 && ` ${g.modifier > 0 ? "+" : "−"} ${Math.abs(g.modifier)}`}
                 </span>
                 {nat20 > 0 && <Badge className="h-5 bg-[#d4a017] text-black">20 naturale!</Badge>}
                 {nat1 > 0 && <Badge variant="destructive" className="h-5">1 naturale</Badge>}

@@ -133,6 +133,7 @@ export function RollingDie({
   delay,
   duration,
   highlight,
+  discarded,
   className,
 }: {
   sides: number;
@@ -142,6 +143,8 @@ export function RollingDie({
   delay: number;
   duration: number;
   highlight?: "max" | "min";
+  /** tiro scartato (vantaggio/svantaggio): si spegne quando il dado si ferma */
+  discarded?: boolean;
   className?: string;
 }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -181,7 +184,8 @@ export function RollingDie({
     <div
       ref={ref}
       className={cn(
-        "relative rounded-full drop-shadow-[0_6px_6px_rgba(0,0,0,.45)] transition-[filter] duration-300",
+        "relative rounded-full drop-shadow-[0_6px_6px_rgba(0,0,0,.45)] transition-[filter,opacity,scale] duration-300",
+        settled && discarded && "scale-90 opacity-35 grayscale",
         settled && highlight === "max" && "drop-shadow-[0_0_14px_rgba(255,214,90,.95)]",
         settled && highlight === "min" && "drop-shadow-[0_0_14px_rgba(240,62,62,.9)]",
         className,

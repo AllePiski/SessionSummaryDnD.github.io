@@ -15,19 +15,23 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import { CharacterAvatar } from "@/components/avatars/character-avatar";
 import { CharacterDialog } from "@/components/characters/character-dialog";
 import { PageHeader, PageLoading } from "@/components/page-header";
 import { PartyWizard } from "./party-wizard";
-import { useCharacters } from "@/hooks/use-data";
+import { useCharacters, useRecording, useSessions } from "@/hooks/use-data";
 import { characterColor } from "@/lib/colors";
 import { raceLabel } from "@/lib/races";
-import { removeCharacter } from "@/lib/repo";
+import { deleteParty, removeCharacter } from "@/lib/repo";
 import type { Character } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 export function PartyView() {
   const characters = useCharacters();
+  const sessions = useSessions();
+  const { state } = useRecording();
+  const [confirmParty, setConfirmParty] = useState(false);
   const [editing, setEditing] = useState<Character | null>(null);
   const [creating, setCreating] = useState<"pc" | "npc" | null>(null);
   const [deleting, setDeleting] = useState<Character | null>(null);
@@ -39,6 +43,8 @@ export function PartyView() {
   const npcs = characters.filter((c) => c.kind === "npc");
 
   if (pcs.length === 0) return <PartyWizard existingMaster={master} />;
+
+  const recording = state.status !== "idle";
 
   async function confirmDelete() {
     if (!deleting) return;
@@ -53,9 +59,19 @@ export function PartyView() {
         title="Il party"
         description="I personaggi che partecipano alle sessioni. I PNG aggiunti durante il gioco finiscono tra i personaggi incontrati."
         actions={
-          <Button onClick={() => setCreating("pc")}>
-            <UserRoundPlus /> Aggiungi personaggio
-          </Button>
+          <>
+            <Button onClick={() => setCreating("pc")}>
+              <UserRoundPlus /> Aggiungi personaggio
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => setConfirmParty(true)}
+              disabled={recording}
+              title={recording ? "Termina prima la registrazione in corso" : undefined}
+            >
+              <Trash2 /> Elimina party
+            </Button>
+          </>
         }
       />
 
@@ -112,7 +128,102 @@ export function PartyView() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      <DeletePartyDialog
+        open={confirmParty}
+        onOpenChange={setConfirmParty}
+        pcCount={pcs.length}
+        npcCount={npcs.length}
+        sessionCount={sessions?.length ?? 0}
+      />
     </div>
+  );
+}
+
+function DeletePartyDialog({
+  open,
+  onOpenChange,
+  pcCount,
+  npcCount,
+  sessionCount,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  pcCount: number;
+  npcCount: number;
+  sessionCount: number;
+}) {
+  const [withSessions, setWithSessions] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  async function confirm() {
+    setDeleting(true);
+    try {
+      await deleteParty({ withSessions });
+      toast.success(withSessions ? "Party e sessioni eliminati." : "Party eliminato. Le sessioni restano nell'archivio.");
+      onOpenChange(false);
+    } catch {
+      toast.error("Non sono riuscito a eliminare il party.");
+    } finally {
+      setDeleting(false);
+    }
+  }
+
+  const who = [
+    "il master",
+    `${pcCount} ${pcCount === 1 ? "personaggio" : "personaggi"} del party`,
+    ...(npcCount > 0 ? [`${npcCount} PNG incontrati`] : []),
+  ].join(", ");
+
+  return (
+    <AlertDialog
+      open={open}
+      onOpenChange={(o) => {
+        onOpenChange(o);
+        if (!o) setWithSessions(false);
+      }}
+    >
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Eliminare l&apos;intero party?</AlertDialogTitle>
+          <AlertDialogDescription>
+            Verranno rimossi {who}. Dopo potrai creare un nuovo party da zero.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        {sessionCount > 0 && (
+          <div className="grid gap-2 rounded-lg border p-3">
+            <label className="flex cursor-pointer items-start gap-2.5 text-sm">
+              <Checkbox
+                checked={withSessions}
+                onCheckedChange={(v) => setWithSessions(v === true)}
+                className="mt-0.5"
+              />
+              <span>
+                Elimina anche {sessionCount === 1 ? "la sessione registrata" : `le ${sessionCount} sessioni registrate`}{" "}
+                (audio e sceneggiature)
+              </span>
+            </label>
+            <p className={cn("text-xs", withSessions ? "text-destructive" : "text-muted-foreground")}>
+              {withSessions
+                ? "Non si può annullare. Gli audio che hai già scaricato non vengono toccati."
+                : "Le sessioni restano nell'archivio e continuano a mostrare i nomi dei personaggi."}
+            </p>
+          </div>
+        )}
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={deleting}>Annulla</AlertDialogCancel>
+          <AlertDialogAction
+            variant="destructive"
+            disabled={deleting}
+            onClick={(e) => {
+              e.preventDefault();
+              void confirm();
+            }}
+          >
+            {withSessions ? "Elimina party e sessioni" : "Elimina party"}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   );
 }
 

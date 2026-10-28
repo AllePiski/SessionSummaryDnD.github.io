@@ -31,7 +31,8 @@ export async function createParty(master: CharacterDraft, members: CharacterDraf
     const now = Date.now();
     let order = existing.reduce((max, c) => Math.max(max, c.order), 0);
     const rows: Character[] = [];
-    const currentMaster = existing.find((c) => c.kind === "master");
+    // un master archiviato appartiene a un party eliminato: non va riutilizzato
+    const currentMaster = existing.find((c) => c.kind === "master" && !c.archived);
     if (currentMaster) {
       await db.characters.update(currentMaster.id, clean(master));
     } else {
@@ -87,8 +88,36 @@ export async function updateCharacter(id: string, draft: CharacterDraft, kind?: 
 export async function removeCharacter(id: string) {
   await db.transaction("rw", db.characters, db.sessions, async () => {
     const used = await db.sessions.filter((s) => s.participantIds.includes(id)).count();
-    if (used > 0) await db.characters.update(id, { archived: true, colorSlot: -1 });
+    if (used > 0) await db.characters.update(id, { archived: true });
     else await db.characters.delete(id);
+  });
+}
+
+/**
+ * Elimina l'intero party (master, personaggi e PNG). Senza `withSessions` i
+ * personaggi che compaiono in sessioni registrate vengono solo nascosti, così
+ * archivio e sceneggiature mantengono i nomi. Lo storico dei dadi si azzera.
+ */
+export async function deleteParty({ withSessions }: { withSessions: boolean }) {
+  await db.transaction("rw", [db.characters, db.sessions, db.audio, db.chunks, db.settings], async () => {
+    if (withSessions) {
+      await Promise.all([db.sessions.clear(), db.audio.clear(), db.chunks.clear(), db.characters.clear()]);
+    } else {
+      const sessions = await db.sessions.toArray();
+      const used = new Set(
+        sessions.flatMap((s) => [
+          ...s.participantIds,
+          ...s.turns.flatMap((t) => t.speakerIds),
+          ...s.lines.flatMap((l) => l.speakerIds),
+        ]),
+      );
+      const characters = await db.characters.toArray();
+      await db.characters.bulkDelete(characters.filter((c) => !used.has(c.id)).map((c) => c.id));
+      await Promise.all(
+        characters.filter((c) => used.has(c.id) && !c.archived).map((c) => db.characters.update(c.id, { archived: true })),
+      );
+    }
+    await db.settings.delete("dice");
   });
 }
 

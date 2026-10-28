@@ -48,9 +48,13 @@ export function DashboardView() {
       durationMs: done.reduce((sum, s) => sum + s.durationMs, 0),
       turns: done.reduce((sum, s) => sum + s.turns.length, 0),
       last: done[0],
-      talk: [...talk.values()].sort((a, b) => b.talkMs - a.talkMs).slice(0, 8),
+      // solo il party attuale: i personaggi di party eliminati restano nell'archivio
+      talk: [...talk.values()]
+        .filter((s) => characterMap.get(s.id)?.archived !== true)
+        .sort((a, b) => b.talkMs - a.talkMs)
+        .slice(0, 8),
     };
-  }, [sessions]);
+  }, [sessions, characterMap]);
 
   if (characters === undefined || sessions === undefined) return <PageLoading />;
 
@@ -172,7 +176,7 @@ export function DashboardView() {
             <CardTitle className="flex items-center gap-2">
               <AudioLines className="size-4 text-muted-foreground" /> Chi parla di più
             </CardTitle>
-            <CardDescription>Tempo di parola su tutte le sessioni.</CardDescription>
+            <CardDescription>Tempo di parola del party in tutte le sessioni.</CardDescription>
           </CardHeader>
           <CardContent>
             <TalkTime stats={totals.talk} characters={characterMap} totalMs={totals.durationMs} />

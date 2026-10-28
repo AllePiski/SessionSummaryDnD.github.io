@@ -6,7 +6,7 @@ Realizzata con Next.js (export statico), React, Tailwind CSS e shadcn/ui. Tutto 
 
 ## Funzionalità
 
-- **Party**: si parte dal numero di giocatori, poi nome, giocatore, classe e avatar di ogni personaggio, più il master.
+- **Party**: si parte dal numero di giocatori, poi nome, giocatore, classe e avatar di ogni personaggio, più il master. Il party si può eliminare per intero (con conferma), scegliendo se tenere o cancellare anche le sessioni registrate.
 - **Avatar**: 20 razze in versione maschile e femminile (umano/umana, elfo/elfa, mezzelfo/mezzelfa, orco/orchessa, nano/nana, tiefling, dragonide, tabaxi…) oppure una foto caricata.
 - **Nuova sessione**: data di gioco, titolo facoltativo, scelta dei personaggi presenti, prova del microfono.
 - **Registrazione**: si tocca l'avatar di chi parla (o si usano i tasti `1`–`0`) e il personaggio si illumina. Con **Seleziona** si scelgono più personaggi per una discussione. I PNG che compaiono si aggiungono al volo.

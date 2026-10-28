@@ -14,15 +14,15 @@ import { CharacterAvatar } from "@/components/avatars/character-avatar";
 import { CharacterDialog } from "@/components/characters/character-dialog";
 import { DatePicker } from "@/components/date-picker";
 import { PageHeader, PageLoading } from "@/components/page-header";
-import { SETTING_DEVICE, SETTING_LANG, SETTING_TRANSCRIBE } from "@/components/settings-dialog";
+import { SETTING_DEVICE, SETTING_LANG } from "@/lib/settings";
 import { MicCheck } from "./mic-check";
-import { useCharacters, useRecording, useSetting } from "@/hooks/use-data";
+import { useCharacters, useRecording, useSetting, useTranscription } from "@/hooks/use-data";
 import { audioFileName, isRecordingSupported, pickMimeType } from "@/lib/audio";
 import { characterColor } from "@/lib/colors";
 import { defaultSessionTitle, todayISO } from "@/lib/format";
 import { raceLabel } from "@/lib/races";
 import { createSession, deleteSession, requestPersistentStorage, setSetting } from "@/lib/repo";
-import { SPEECH_LANGUAGES, isSpeechRecognitionSupported } from "@/lib/transcriber";
+import { SPEECH_LANGUAGES } from "@/lib/transcriber";
 import type { Character } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -30,18 +30,16 @@ const noopSubscribe = () => () => {};
 
 /** Capacità del browser (lette solo sul client, durante il prerender valgono true). */
 function useBrowserSupport() {
-  const speech = useSyncExternalStore(noopSubscribe, isSpeechRecognitionSupported, () => true);
   const recording = useSyncExternalStore(noopSubscribe, isRecordingSupported, () => true);
   const mime = useSyncExternalStore(noopSubscribe, pickMimeType, () => "audio/webm");
-  return { speech, recording, mime };
+  return { recording, mime };
 }
 
 export function SessionSetup() {
   const characters = useCharacters();
   const { engine } = useRecording();
   const support = useBrowserSupport();
-  const lang = useSetting(SETTING_LANG, "it-IT");
-  const transcribe = useSetting(SETTING_TRANSCRIBE, true);
+  const speech = useTranscription();
   const savedDevice = useSetting(SETTING_DEVICE, "");
 
   const [date, setDate] = useState(todayISO);
@@ -82,7 +80,8 @@ export function SessionSetup() {
   const sessionTitle = title.trim() || defaultSessionTitle(date);
   const presentPcs = pcs.filter((c) => !absent.includes(c.id));
   const participantIds = [master.id, ...presentPcs.map((c) => c.id), ...guests];
-  const canTranscribe = transcribe && support.speech;
+  const canTranscribe = speech.enabled;
+  const lang = speech.lang;
 
   const toggle = (list: string[], id: string) => (list.includes(id) ? list.filter((x) => x !== id) : [...list, id]);
 
@@ -218,7 +217,10 @@ export function SessionSetup() {
 
           <Card>
             <CardHeader>
-              <CardTitle>Audio e trascrizione</CardTitle>
+              <CardTitle>Audio</CardTitle>
+              <CardDescription>
+                Durante la sessione selezioni tu chi sta parlando. Il riconoscimento vocale è facoltativo.
+              </CardDescription>
             </CardHeader>
             <CardContent className="grid gap-4">
               <MicCheck
@@ -228,19 +230,16 @@ export function SessionSetup() {
                   void setSetting(SETTING_DEVICE, id);
                 }}
               />
-              {support.speech ? (
+              {speech.supported ? (
                 <>
                   <div className="flex items-center justify-between gap-3">
-                    <Label htmlFor="setup-transcribe" className="font-normal">
-                      Trascrizione automatica
+                    <Label htmlFor="setup-transcribe" className="flex-col items-start gap-0.5 font-normal">
+                      <span>Riconoscimento vocale</span>
+                      <span className="text-xs text-muted-foreground">Trascrive anche le battute</span>
                     </Label>
-                    <Switch
-                      id="setup-transcribe"
-                      checked={transcribe}
-                      onCheckedChange={(v) => void setSetting(SETTING_TRANSCRIBE, v)}
-                    />
+                    <Switch id="setup-transcribe" checked={speech.enabled} onCheckedChange={speech.setEnabled} />
                   </div>
-                  {transcribe && (
+                  {speech.enabled && (
                     <div className="flex items-center justify-between gap-3">
                       <Label htmlFor="setup-lang" className="font-normal">
                         Lingua
@@ -263,8 +262,8 @@ export function SessionSetup() {
               ) : (
                 <p className="flex gap-2 rounded-lg bg-muted p-3 text-sm text-muted-foreground">
                   <TriangleAlert className="mt-0.5 size-4 shrink-0" />
-                  Questo browser non supporta la trascrizione automatica: registrerò audio e turni di parola, e potrai
-                  scrivere le battute dopo. Per la trascrizione usa Chrome, Edge o Safari.
+                  Il riconoscimento vocale non è disponibile in questo browser (serve Chrome, Edge o Safari). Audio e
+                  turni di parola vengono registrati comunque, e potrai scrivere le battute dopo.
                 </p>
               )}
             </CardContent>

@@ -28,15 +28,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Separator } from "@/components/ui/separator";
 import { SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
 import { Switch } from "@/components/ui/switch";
-import { useRecording, useSetting } from "@/hooks/use-data";
+import { useRecording, useTranscription } from "@/hooks/use-data";
 import { db } from "@/lib/db";
 import { formatBytes } from "@/lib/format";
 import { setSetting } from "@/lib/repo";
-import { SPEECH_LANGUAGES, isSpeechRecognitionSupported } from "@/lib/transcriber";
-
-export const SETTING_LANG = "speechLang";
-export const SETTING_TRANSCRIBE = "transcribe";
-export const SETTING_DEVICE = "deviceId";
+import { SETTING_LANG } from "@/lib/settings";
+import { SPEECH_LANGUAGES } from "@/lib/transcriber";
 
 interface StorageInfo {
   usage: number;
@@ -54,19 +51,14 @@ async function readStorage(): Promise<StorageInfo | null> {
 export function SettingsDialog() {
   const [open, setOpen] = useState(false);
   const [storage, setStorage] = useState<StorageInfo | null>(null);
-  const [speechSupported, setSpeechSupported] = useState(true);
-  const lang = useSetting(SETTING_LANG, "it-IT");
-  const transcribe = useSetting(SETTING_TRANSCRIBE, true);
+  const speech = useTranscription();
   const { state } = useRecording();
 
   useEffect(() => {
     if (!open) return;
     let cancelled = false;
     void readStorage().then((info) => {
-      if (!cancelled) {
-        setStorage(info);
-        setSpeechSupported(isSpeechRecognitionSupported());
-      }
+      if (!cancelled) setStorage(info);
     });
     return () => {
       cancelled = true;
@@ -106,30 +98,31 @@ export function SettingsDialog() {
 
           <div className="grid gap-5">
             <section className="grid gap-3">
-              <h3 className="text-sm font-medium">Trascrizione automatica</h3>
-              {!speechSupported && (
+              <h3 className="text-sm font-medium">Riconoscimento vocale (facoltativo)</h3>
+              {!speech.supported && (
                 <p className="flex gap-2 rounded-lg bg-muted p-3 text-sm text-muted-foreground">
                   <TriangleAlert className="mt-0.5 size-4 shrink-0" />
-                  Questo browser non supporta il riconoscimento vocale: l&apos;audio e i turni di parola vengono
-                  registrati comunque. Per la trascrizione usa Chrome, Edge o Safari.
+                  Questo browser non supporta il riconoscimento vocale (serve Chrome, Edge o Safari). Audio e turni di
+                  parola vengono registrati comunque.
                 </p>
               )}
               <div className="flex items-center justify-between gap-4">
                 <Label htmlFor="transcribe" className="flex-col items-start gap-0.5">
-                  <span>Trascrivi mentre registri</span>
+                  <span>Trascrivi le battute</span>
                   <span className="text-xs font-normal text-muted-foreground">
-                    Il testo viene associato al personaggio selezionato.
+                    Spento di base: selezioni tu chi parla. Acceso, il testo viene assegnato al personaggio selezionato.
                   </span>
                 </Label>
                 <Switch
                   id="transcribe"
-                  checked={transcribe}
-                  onCheckedChange={(v) => void setSetting(SETTING_TRANSCRIBE, v)}
+                  checked={speech.enabled}
+                  disabled={!speech.supported}
+                  onCheckedChange={speech.setEnabled}
                 />
               </div>
               <div className="flex items-center justify-between gap-4">
                 <Label htmlFor="lang">Lingua parlata al tavolo</Label>
-                <Select value={lang} onValueChange={(v) => void setSetting(SETTING_LANG, v)}>
+                <Select value={speech.lang} onValueChange={(v) => void setSetting(SETTING_LANG, v)}>
                   <SelectTrigger id="lang" className="w-44">
                     <SelectValue />
                   </SelectTrigger>

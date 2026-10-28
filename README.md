@@ -10,14 +10,14 @@ Realizzata con Next.js (export statico), React, Tailwind CSS e shadcn/ui. Tutto 
 - **Avatar**: 20 razze in versione maschile e femminile (umano/umana, elfo/elfa, mezzelfo/mezzelfa, orco/orchessa, nano/nana, tiefling, dragonide, tabaxi…) oppure una foto caricata.
 - **Nuova sessione**: data di gioco, titolo facoltativo, scelta dei personaggi presenti, prova del microfono.
 - **Registrazione**: si tocca l'avatar di chi parla (o si usano i tasti `1`–`0`) e il personaggio si illumina. Con **Seleziona** si scelgono più personaggi per una discussione. I PNG che compaiono si aggiungono al volo.
-- **Trascrizione dal vivo** (Chrome, Edge, Safari): ogni frase viene associata al personaggio selezionato in quel momento.
+- **Riconoscimento vocale (facoltativo, spento di base)**: si attiva dall'interruttore nella barra laterale, anche a registrazione in corso. Quando è acceso (Chrome, Edge, Safari) ogni frase viene trascritta e associata al personaggio selezionato in quel momento; quando è spento la sceneggiatura riporta chi ha parlato e quando, e le battute si possono scrivere a mano.
 - **Dashboard della sessione**: audio con timeline per personaggio, tempo di parola, sceneggiatura modificabile (correggi il testo, riassegna chi parla, ascolta da un punto preciso), note del master.
 - **Salvataggio in locale**: l'audio si scarica con un nome basato sulla data di gioco, ad esempio `Sessione 2026-10-28 - La cripta.webm`. La sceneggiatura si esporta in `.txt`, `.md` o PDF (stampa).
 - **Sicurezza dei dati**: l'audio viene salvato a pezzi durante la registrazione; se la scheda si chiude o il browser va in crash, la sessione viene recuperata alla riapertura.
 
 ## Note sui browser
 
-| | Registrazione audio | Trascrizione automatica |
+| | Registrazione audio | Riconoscimento vocale (opzionale) |
 |---|---|---|
 | Chrome / Edge (desktop e Android) | ✅ | ✅ (il riconoscimento vocale usa i servizi del browser) |
 | Safari (macOS / iOS) | ✅ | ✅ |

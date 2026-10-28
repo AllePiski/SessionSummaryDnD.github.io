@@ -1,9 +1,12 @@
 "use client";
 
-import { useMemo, useSyncExternalStore } from "react";
+import { useCallback, useMemo, useSyncExternalStore } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { db } from "@/lib/db";
 import { getRecordingEngine, IDLE_ENGINE_STATE } from "@/lib/recording-engine";
+import { setSetting } from "@/lib/repo";
+import { DEFAULT_LANG, DEFAULT_TRANSCRIBE, SETTING_LANG, SETTING_TRANSCRIBE } from "@/lib/settings";
+import { isSpeechRecognitionSupported } from "@/lib/transcriber";
 import type { Character } from "@/lib/types";
 
 /** Personaggi attivi ordinati (undefined mentre carica). */
@@ -45,4 +48,24 @@ export function useRecording() {
   const engine = getRecordingEngine();
   const state = useSyncExternalStore(engine.subscribe, engine.getSnapshot, () => IDLE_ENGINE_STATE);
   return { state, engine };
+}
+
+const noopSubscribe = () => () => {};
+
+/**
+ * Opzione "riconoscimento vocale": salvata nelle impostazioni e applicata
+ * subito anche alla registrazione in corso.
+ */
+export function useTranscription() {
+  const enabled = useSetting(SETTING_TRANSCRIBE, DEFAULT_TRANSCRIBE);
+  const lang = useSetting(SETTING_LANG, DEFAULT_LANG);
+  const supported = useSyncExternalStore(noopSubscribe, isSpeechRecognitionSupported, () => true);
+  const setEnabled = useCallback(
+    (value: boolean) => {
+      void setSetting(SETTING_TRANSCRIBE, value);
+      getRecordingEngine().setTranscription(value, lang);
+    },
+    [lang],
+  );
+  return { enabled: enabled && supported, supported, lang, setEnabled };
 }

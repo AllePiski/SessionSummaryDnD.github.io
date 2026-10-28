@@ -176,16 +176,8 @@ class RecordingEngine {
       currentTurn: initial.length ? { speakerIds: initial, start: 0 } : null,
     });
 
-    if (opts.transcribe && isSpeechRecognitionSupported()) {
-      this.transcriber = new LiveTranscriber({
-        lang: opts.language,
-        onResult: this.onSpeechResult,
-        onStatus: (speech, speechMessage) => this.set({ speech, speechMessage }),
-      });
-      this.transcriber.start();
-    } else {
-      this.set({ speech: isSpeechRecognitionSupported() ? "off" : "unsupported" });
-    }
+    this.set({ speech: "off" });
+    if (opts.transcribe) this.setTranscription(true, opts.language);
 
     void this.acquireWakeLock();
     document.addEventListener("visibilitychange", this.onVisibilityChange);
@@ -207,6 +199,35 @@ class RecordingEngine {
       currentTurn: ids.length ? { speakerIds: ids, start: now } : null,
     });
     this.scheduleSave();
+  }
+
+  /** Accende o spegne il riconoscimento vocale, anche a registrazione in corso. */
+  setTranscription(enabled: boolean, language: string) {
+    if (!this.isActive()) return;
+    if (!enabled) {
+      this.transcriber?.stop("off");
+      this.transcriber = null;
+      this.phrases.clear();
+      this.set({ interim: null, speech: "off", speechMessage: undefined });
+      return;
+    }
+    if (this.transcriber) return;
+    if (!isSpeechRecognitionSupported()) {
+      this.set({ speech: "unsupported" });
+      return;
+    }
+    const transcriber: LiveTranscriber = new LiveTranscriber({
+      lang: language,
+      onResult: this.onSpeechResult,
+      // un riconoscitore già spento non deve più cambiare lo stato
+      onStatus: (speech, speechMessage) => {
+        if (this.transcriber === transcriber) this.set({ speech, speechMessage });
+      },
+    });
+    this.transcriber = transcriber;
+    if (this.state.status === "recording") transcriber.start();
+    else this.set({ speech: "paused" });
+    if (this.state.sessionId) void db.sessions.update(this.state.sessionId, { transcription: "live" });
   }
 
   addParticipant(id: string) {

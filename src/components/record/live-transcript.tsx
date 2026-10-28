@@ -4,9 +4,9 @@ import { useEffect, useMemo, useRef } from "react";
 import { MessageSquareText } from "lucide-react";
 import { CharacterAvatar } from "@/components/avatars/character-avatar";
 import { characterColor } from "@/lib/colors";
-import { formatClock, sameSpeakers } from "@/lib/format";
+import { formatClock, formatDuration, sameSpeakers } from "@/lib/format";
 import { speakerNames } from "@/lib/screenplay";
-import type { Character, TranscriptLine } from "@/lib/types";
+import type { Character, TranscriptLine, Turn } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 const MAX_VISIBLE = 160;
@@ -23,12 +23,10 @@ export function LiveTranscript({
   lines,
   interim,
   characters,
-  enabled,
 }: {
   lines: TranscriptLine[];
   interim: { text: string; speakerIds: string[] } | null;
   characters: Map<string, Character>;
-  enabled: boolean;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const stickRef = useRef(true);
@@ -64,15 +62,7 @@ export function LiveTranscript({
         <div className="grid h-full place-items-center py-10 text-center text-sm text-muted-foreground">
           <div className="grid justify-items-center gap-2">
             <MessageSquareText className="size-8 opacity-50" />
-            {enabled ? (
-              <p>Le battute compariranno qui mentre parlate.</p>
-            ) : (
-              <p>
-                Trascrizione non attiva: vengono registrati
-                <br />
-                l&apos;audio e i turni di parola.
-              </p>
-            )}
+            <p>Le battute compariranno qui mentre parlate.</p>
           </div>
         </div>
       )}
@@ -92,6 +82,69 @@ export function LiveTranscript({
           <li>
             <GroupHeader ids={interim.speakerIds} characters={characters} />
             <p className="mt-1 pl-9 text-sm text-muted-foreground italic">{interim.text}…</p>
+          </li>
+        )}
+      </ol>
+    </div>
+  );
+}
+
+/** Registro dei turni di parola (quando il riconoscimento vocale è spento). */
+export function TurnLog({
+  turns,
+  currentTurn,
+  characters,
+}: {
+  turns: Turn[];
+  currentTurn: { speakerIds: string[]; start: number } | null;
+  characters: Map<string, Character>;
+}) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const stickRef = useRef(true);
+  const visible = turns.filter((t) => t.end - t.start >= 1000).slice(-MAX_VISIBLE);
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (el && stickRef.current) el.scrollTop = el.scrollHeight;
+  }, [visible.length, currentTurn]);
+
+  return (
+    <div
+      ref={scrollRef}
+      onScroll={(e) => {
+        const el = e.currentTarget;
+        stickRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 60;
+      }}
+      className="h-full overflow-y-auto px-4 py-3"
+    >
+      {visible.length === 0 && !currentTurn && (
+        <div className="grid h-full place-items-center py-10 text-center text-sm text-muted-foreground">
+          <div className="grid justify-items-center gap-2">
+            <MessageSquareText className="size-8 opacity-50" />
+            <p>
+              Tocca chi sta parlando: qui compare
+              <br />
+              la sequenza dei turni di parola.
+            </p>
+          </div>
+        </div>
+      )}
+      <ol className="grid gap-3">
+        {visible.map((turn) => (
+          <li key={turn.start}>
+            <GroupHeader ids={turn.speakerIds} t={turn.start} characters={characters} />
+            <p className="mt-0.5 pl-9 text-xs text-muted-foreground">
+              {turn.speakerIds.length > 1 ? "Discussione · " : ""}
+              {formatDuration(turn.end - turn.start)}
+            </p>
+          </li>
+        ))}
+        {currentTurn && (
+          <li>
+            <GroupHeader ids={currentTurn.speakerIds} t={currentTurn.start} characters={characters} />
+            <p className="mt-0.5 flex items-center gap-1.5 pl-9 text-xs font-medium">
+              <span className="rec-dot size-1.5 rounded-full bg-rec" /> Sta parlando
+            </p>
           </li>
         )}
       </ol>

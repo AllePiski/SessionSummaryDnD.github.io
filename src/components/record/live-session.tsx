@@ -22,7 +22,7 @@ import { CharacterAvatar } from "@/components/avatars/character-avatar";
 import { AddParticipantDialog } from "./add-participant-dialog";
 import { ElapsedTime } from "./elapsed-time";
 import { LevelMeter } from "./level-meter";
-import { LiveTranscript } from "./live-transcript";
+import { LiveTranscript, TurnLog } from "./live-transcript";
 import { AddSpeakerTile, SpeakerTile } from "./speaker-tile";
 import { useCharacterMap, useRecording, useSession } from "@/hooks/use-data";
 import { formatLongDate } from "@/lib/format";
@@ -133,6 +133,7 @@ export function LiveSession() {
 
   const paused = state.status === "paused";
   const discussion = active.length > 1;
+  const transcribing = state.speech === "listening" || state.speech === "paused" || state.speech === "error";
 
   return (
     <div className="mx-auto grid max-w-7xl gap-5">
@@ -154,7 +155,7 @@ export function LiveSession() {
         </div>
         <ElapsedTime className="text-3xl font-semibold tracking-tight md:text-4xl" />
         <LevelMeter getLevel={engine.level} active={state.status === "recording"} className="hidden sm:flex" />
-        <SpeechBadge status={state.speech} message={state.speechMessage} />
+        {transcribing && <SpeechBadge status={state.speech} message={state.speechMessage} />}
         <div className="ml-auto flex items-center gap-2">
           <Button variant="outline" onClick={togglePause} disabled={busy}>
             {paused ? <Play /> : <Pause />}
@@ -253,17 +254,18 @@ export function LiveSession() {
         <Card className="h-[60vh] gap-0 py-0 lg:sticky lg:top-20 lg:h-[calc(100vh-8rem)]">
           <CardHeader className="border-b py-3">
             <CardTitle className="flex items-center justify-between gap-2 text-sm">
-              Trascrizione dal vivo
-              <span className="text-xs font-normal text-muted-foreground">{state.lines.length} battute</span>
+              {transcribing ? "Trascrizione dal vivo" : "Turni di parola"}
+              <span className="text-xs font-normal text-muted-foreground">
+                {transcribing ? `${state.lines.length} battute` : `${state.turns.length + (state.currentTurn ? 1 : 0)} turni`}
+              </span>
             </CardTitle>
           </CardHeader>
           <div className="min-h-0 flex-1">
-            <LiveTranscript
-              lines={state.lines}
-              interim={state.interim}
-              characters={characters}
-              enabled={state.speech === "listening" || state.speech === "paused" || state.lines.length > 0}
-            />
+            {transcribing ? (
+              <LiveTranscript lines={state.lines} interim={state.interim} characters={characters} />
+            ) : (
+              <TurnLog turns={state.turns} currentTurn={state.currentTurn} characters={characters} />
+            )}
           </div>
         </Card>
       </div>
@@ -313,14 +315,10 @@ export function LiveSession() {
 function SpeechBadge({ status, message }: { status: string; message?: string }) {
   const label =
     status === "listening"
-      ? "Trascrizione attiva"
+      ? "Riconoscimento vocale attivo"
       : status === "paused"
-        ? "Trascrizione in pausa"
-        : status === "unsupported"
-          ? "Trascrizione non supportata"
-          : status === "error"
-            ? "Trascrizione: problema"
-            : "Trascrizione disattivata";
+        ? "Riconoscimento vocale in pausa"
+        : "Riconoscimento vocale: problema";
   const dot =
     status === "listening" ? "bg-[#0ca30c]" : status === "error" ? "bg-[#fab219]" : "bg-muted-foreground";
   const badge = (

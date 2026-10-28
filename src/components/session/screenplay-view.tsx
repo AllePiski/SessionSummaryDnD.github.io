@@ -251,7 +251,7 @@ function EntryView({ entry, sessionId }: { entry: ScreenplayEntry; sessionId: st
       {entry.text ? (
         <span>{entry.text}</span>
       ) : (
-        <span className="text-muted-foreground italic">(parte non trascritta: ascolta e clicca per scriverla)</span>
+        <span className="text-muted-foreground italic">(nessun testo: ascolta e clicca per scrivere la battuta)</span>
       )}
       <Pencil className="no-print absolute top-1 -right-5 size-3.5 text-muted-foreground opacity-0 group-hover/entry:opacity-100" />
     </button>

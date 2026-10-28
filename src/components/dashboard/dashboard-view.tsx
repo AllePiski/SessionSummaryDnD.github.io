@@ -46,7 +46,7 @@ export function DashboardView() {
     return {
       count: done.length,
       durationMs: done.reduce((sum, s) => sum + s.durationMs, 0),
-      lines: done.reduce((sum, s) => sum + s.lines.length, 0),
+      turns: done.reduce((sum, s) => sum + s.turns.length, 0),
       last: done[0],
       talk: [...talk.values()].sort((a, b) => b.talkMs - a.talkMs).slice(0, 8),
     };
@@ -129,7 +129,7 @@ export function DashboardView() {
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Tile label="Sessioni registrate" value={String(totals.count)} />
         <Tile label="Tempo di gioco registrato" value={totals.durationMs ? formatDuration(totals.durationMs) : "—"} />
-        <Tile label="Battute trascritte" value={totals.lines.toLocaleString("it-IT")} />
+        <Tile label="Turni di parola" value={totals.turns.toLocaleString("it-IT")} />
         <Tile
           label="Ultima sessione"
           value={totals.last ? formatShortDate(totals.last.date) : "—"}

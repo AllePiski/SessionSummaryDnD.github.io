@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useTheme } from "next-themes";
 import { toast } from "sonner";
-import { Archive, LayoutDashboard, Mic, Moon, Sun, Users } from "lucide-react";
+import { Archive, AudioLines, LayoutDashboard, Mic, Moon, Sun, Users } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -24,11 +24,13 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
+import { Switch } from "@/components/ui/switch";
 import { CharacterAvatar } from "@/components/avatars/character-avatar";
 import { ElapsedTime } from "@/components/record/elapsed-time";
 import { SettingsDialog } from "@/components/settings-dialog";
-import { useCharacters, useRecording } from "@/hooks/use-data";
+import { useCharacters, useRecording, useTranscription } from "@/hooks/use-data";
 import { recoverInterruptedSessions } from "@/lib/repo";
 import { characterColor } from "@/lib/colors";
 
@@ -137,10 +139,49 @@ function AppSidebar({ pathname }: { pathname: string }) {
         )}
       </SidebarContent>
       <SidebarFooter>
+        <SpeechToggle />
         <SettingsDialog />
       </SidebarFooter>
       <SidebarRail />
     </Sidebar>
+  );
+}
+
+/** Opzione facoltativa: trascrive le battute oltre alla selezione manuale di chi parla. */
+function SpeechToggle() {
+  const { enabled, supported, setEnabled } = useTranscription();
+  return (
+    <>
+      <div className="grid gap-1 rounded-lg border border-sidebar-border p-2.5 group-data-[collapsible=icon]:hidden">
+        <div className="flex items-center gap-2">
+          <AudioLines className="size-4 shrink-0 text-muted-foreground" />
+          <Label htmlFor="sidebar-speech" className="flex-1 text-sm font-normal">
+            Riconoscimento vocale
+          </Label>
+          <Switch id="sidebar-speech" checked={enabled} disabled={!supported} onCheckedChange={setEnabled} />
+        </div>
+        <p className="text-xs leading-snug text-muted-foreground">
+          {!supported
+            ? "Non disponibile in questo browser."
+            : enabled
+              ? "Le battute vengono trascritte e assegnate a chi è selezionato."
+              : "Spento: selezioni tu chi sta parlando."}
+        </p>
+      </div>
+      <SidebarMenu className="hidden group-data-[collapsible=icon]:flex">
+        <SidebarMenuItem>
+          <SidebarMenuButton
+            isActive={enabled}
+            disabled={!supported}
+            onClick={() => setEnabled(!enabled)}
+            tooltip={enabled ? "Riconoscimento vocale: acceso" : "Riconoscimento vocale: spento"}
+          >
+            <AudioLines />
+            <span>Riconoscimento vocale</span>
+          </SidebarMenuButton>
+        </SidebarMenuItem>
+      </SidebarMenu>
+    </>
   );
 }
 

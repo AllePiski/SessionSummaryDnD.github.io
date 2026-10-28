@@ -152,7 +152,6 @@ function SessionDashboard({
               className="h-8"
             />
             {session.status === "interrupted" && <Badge variant="secondary">Recuperata dopo un&apos;interruzione</Badge>}
-            {session.transcription === "none" && <Badge variant="outline">Senza trascrizione automatica</Badge>}
             <AvatarStack characters={cast} max={7} className="ml-1" />
           </div>
         </div>
@@ -190,9 +189,13 @@ function SessionDashboard({
 
       <div className="no-print grid grid-cols-2 gap-3 lg:grid-cols-4">
         <StatTile label="Durata" value={formatDuration(session.durationMs)} />
-        <StatTile label="Battute trascritte" value={session.lines.length.toLocaleString("it-IT")} detail={`${words.toLocaleString("it-IT")} parole`} />
+        <StatTile
+          label="Turni di parola"
+          value={session.turns.length.toLocaleString("it-IT")}
+          detail={session.lines.length ? `${session.lines.length} battute · ${words.toLocaleString("it-IT")} parole` : undefined}
+        />
         <StatTile label="Personaggi in scena" value={String(cast.length)} detail={`${stats.length} hanno parlato`} />
-        <StatTile label="Discussioni" value={String(discussions)} detail={`${session.turns.length} turni di parola`} />
+        <StatTile label="Discussioni" value={String(discussions)} detail="momenti con più personaggi" />
       </div>
 
       <Card className="no-print">

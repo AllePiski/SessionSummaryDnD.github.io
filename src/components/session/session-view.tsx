@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
-import { ArrowLeft, ScrollText } from "lucide-react";
+import { ArrowLeft, Download, HardDriveDownload, ScrollText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -19,8 +19,9 @@ import { SessionHeader } from "./session-header";
 import { SpeakerTimeline } from "./speaker-timeline";
 import { TalkTime } from "./talk-time";
 import { useCharacterMap, useSession, useSessionAudio } from "@/hooks/use-data";
-import { audioFileName, saveBlob } from "@/lib/audio";
+import { audioFileName } from "@/lib/audio";
 import { countWords, formatBytes, formatDuration, plural } from "@/lib/format";
+import { downloadSessionAudio } from "@/lib/repo";
 import { speakerNames, speakerStats } from "@/lib/screenplay";
 import type { Character, Session } from "@/lib/types";
 
@@ -76,8 +77,7 @@ function SessionDashboard({
 
   async function downloadAudio() {
     if (!audio) return;
-    const result = await saveBlob(audio.blob, audioFileName(session, audio.mimeType));
-    if (result === "saved") toast.success("Audio salvato.");
+    if ((await downloadSessionAudio(session, { sessionId: session.id, ...audio })) === "saved") toast.success("Audio salvato.");
   }
 
   return (
@@ -89,6 +89,16 @@ function SessionDashboard({
         canDownload={!!audio}
         onDownload={() => void downloadAudio()}
       />
+
+      {audio && !session.audioSavedAt && (
+        <div className="no-print flex flex-wrap items-center gap-3 rounded-xl border border-warning/40 bg-warning/10 px-4 py-3 text-sm">
+          <HardDriveDownload className="size-4 shrink-0 text-warning" />
+          <span className="mr-auto">L&apos;audio è salvato solo in questo browser: scaricane una copia per non perderlo.</span>
+          <Button size="sm" onClick={() => void downloadAudio()}>
+            <Download /> Scarica ora
+          </Button>
+        </div>
+      )}
 
       <div className="no-print grid grid-cols-2 gap-3 lg:grid-cols-4">
         <StatTile label="Durata" value={formatDuration(session.durationMs)} />

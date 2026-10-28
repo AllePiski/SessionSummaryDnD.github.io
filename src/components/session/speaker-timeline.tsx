@@ -22,7 +22,7 @@ function tickStep(durationMs: number): number {
 /**
  * Una corsia per personaggio con i momenti in cui parla: si legge a colpo
  * d'occhio chi ha parlato quando (le discussioni compaiono su più corsie).
- * Cliccando su una corsia l'audio salta a quel punto.
+ * Toccando una corsia l'audio salta a quel punto.
  */
 export function SpeakerTimeline({
   session,
@@ -126,7 +126,7 @@ export function SpeakerTimeline({
             if (t !== null && ready) seek(t, true);
           }}
           role="slider"
-          aria-label="Timeline dei personaggi: clicca per ascoltare da quel punto"
+          aria-label="Timeline dei personaggi: scegli un punto per ascoltarlo"
           aria-valuemin={0}
           aria-valuemax={Math.round(duration / 1000)}
           aria-valuenow={Math.round(currentMs / 1000)}

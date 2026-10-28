@@ -57,6 +57,8 @@ export interface Session {
   transcription: "live" | "none";
   audioMimeType?: string;
   audioSize?: number;
+  /** quando l'audio è stato scaricato l'ultima volta (finché manca, esiste solo nel browser) */
+  audioSavedAt?: number;
 }
 
 export interface SessionAudio {

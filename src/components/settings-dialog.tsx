@@ -105,7 +105,7 @@ export function SettingsDialog() {
               )}
               <div className="flex items-center justify-between gap-4">
                 <Label htmlFor="transcribe" className="flex-col items-start gap-0.5">
-                  <span>Trascrivi le battute</span>
+                  <span>Riconoscimento vocale</span>
                   <span className="text-xs font-normal text-muted-foreground">
                     Spento di base: selezioni tu chi parla. Acceso, il testo viene assegnato al personaggio selezionato.
                   </span>

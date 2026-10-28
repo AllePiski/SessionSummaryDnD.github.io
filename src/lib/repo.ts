@@ -4,7 +4,8 @@ import { nextColorSlot } from "./colors";
 import { TIMESLICE_MS } from "./recording-engine";
 import { SETTING_DICE } from "./settings";
 import { sameSpeakers, uid } from "./format";
-import type { Character, CharacterKind, Gender, Session, TranscriptLine } from "./types";
+import { audioFileName, saveBlob } from "./audio";
+import type { Character, CharacterKind, Gender, Session, SessionAudio, TranscriptLine } from "./types";
 
 export interface CharacterDraft {
   name: string;
@@ -154,6 +155,21 @@ export async function deleteSession(id: string) {
     await db.audio.delete(id);
     await db.chunks.where("sessionId").equals(id).delete();
   });
+}
+
+/**
+ * Salva l'audio della sessione in un file con il nome della data di gioco e
+ * ricorda che ora ne esiste una copia fuori dal browser.
+ */
+export async function downloadSessionAudio(
+  session: Pick<Session, "id" | "date" | "title">,
+  audio?: SessionAudio | null,
+): Promise<"saved" | "cancelled" | "missing"> {
+  const file = audio ?? (await db.audio.get(session.id));
+  if (!file) return "missing";
+  const result = await saveBlob(file.blob, audioFileName(session, file.mimeType));
+  if (result === "saved") await db.sessions.update(session.id, { audioSavedAt: Date.now() });
+  return result;
 }
 
 export async function updateSessionInfo(id: string, patch: Pick<Partial<Session>, "title" | "date" | "notes">) {

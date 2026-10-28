@@ -59,19 +59,9 @@ export function PartyView() {
         title="Il party"
         description="I personaggi che partecipano alle sessioni. I PNG aggiunti durante il gioco finiscono tra i personaggi incontrati."
         actions={
-          <>
-            <Button onClick={() => setCreating("pc")}>
-              <UserRoundPlus /> Aggiungi personaggio
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={() => setConfirmParty(true)}
-              disabled={recording}
-              title={recording ? "Termina prima la registrazione in corso" : undefined}
-            >
-              <Trash2 /> Elimina party
-            </Button>
-          </>
+          <Button onClick={() => setCreating("pc")}>
+            <UserRoundPlus /> Aggiungi personaggio
+          </Button>
         }
       />
 
@@ -128,6 +118,20 @@ export function PartyView() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      <section className="mt-12 flex flex-wrap items-center justify-between gap-4 rounded-xl border border-destructive/30 p-4">
+        <div className="max-w-xl">
+          <h3 className="font-semibold">Zona pericolosa</h3>
+          <p className="text-sm text-muted-foreground">
+            {recording
+              ? "Termina la registrazione in corso prima di eliminare il party."
+              : "Elimina il party per ricominciare con un nuovo gruppo. Potrai scegliere se tenere le sessioni registrate."}
+          </p>
+        </div>
+        <Button variant="destructive" onClick={() => setConfirmParty(true)} disabled={recording}>
+          <Trash2 /> Elimina party
+        </Button>
+      </section>
+
       <DeletePartyDialog
         open={confirmParty}
         onOpenChange={setConfirmParty}

@@ -17,7 +17,7 @@ import { CharacterKindToggle, type NewCharacterKind } from "./character-kind-tog
 import { addCharacter, updateCharacter, type CharacterDraft } from "@/lib/repo";
 import type { Character, CharacterKind } from "@/lib/types";
 
-export const EMPTY_DRAFT: CharacterDraft = { name: "", raceId: "umano", gender: "m" };
+const EMPTY_DRAFT: CharacterDraft = { name: "", raceId: "umano", gender: "m" };
 
 function toDraft(c: Character): CharacterDraft {
   return {

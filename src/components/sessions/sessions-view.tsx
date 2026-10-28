@@ -13,9 +13,8 @@ import { Input } from "@/components/ui/input";
 import { AvatarStack } from "@/components/avatars/character-avatar";
 import { PageHeader, PageLoading } from "@/components/page-header";
 import { useCharacterMap, useSessions } from "@/hooks/use-data";
-import { audioFileName, saveBlob } from "@/lib/audio";
-import { db } from "@/lib/db";
-import { formatBytes, formatDuration, formatLongDate } from "@/lib/format";
+import { formatBytes, formatDuration, formatLongDate, plural } from "@/lib/format";
+import { downloadSessionAudio } from "@/lib/repo";
 import type { Character, Session } from "@/lib/types";
 
 export function SessionsView() {
@@ -104,12 +103,9 @@ export function SessionRow({ session, characters }: { session: Session; characte
 
   async function download(event: React.MouseEvent) {
     event.preventDefault();
-    const audio = await db.audio.get(session.id);
-    if (!audio) {
-      toast.error("Audio non disponibile per questa sessione.");
-      return;
-    }
-    await saveBlob(audio.blob, audioFileName(session, audio.mimeType));
+    const result = await downloadSessionAudio(session);
+    if (result === "missing") toast.error("Audio non disponibile per questa sessione.");
+    if (result === "saved") toast.success("Audio salvato.");
   }
 
   return (
@@ -128,13 +124,19 @@ export function SessionRow({ session, characters }: { session: Session; characte
         <p className="text-sm text-muted-foreground capitalize">{format(date, "EEEE", { locale: it })}</p>
         <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
           <span>{formatDuration(session.durationMs)}</span>
-          <span>{session.lines.length} battute</span>
+          <span>{plural(session.turns.length, "turno", "turni")}</span>
+          {session.lines.length > 0 && <span>{plural(session.lines.length, "battuta", "battute")}</span>}
           {session.audioSize ? <span>{formatBytes(session.audioSize)}</span> : null}
           {live && (
             <Badge variant="destructive" className="h-4">
               In registrazione
             </Badge>
           )}
+          {!live && session.audioSize && !session.audioSavedAt ? (
+            <Badge variant="outline" className="h-4 gap-1 border-warning/50">
+              <span className="size-1.5 rounded-full bg-warning" aria-hidden /> Audio non scaricato
+            </Badge>
+          ) : null}
           {session.status === "interrupted" && (
             <Badge variant="secondary" className="h-4">
               Recuperata

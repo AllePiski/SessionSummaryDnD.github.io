@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { RecordView } from "@/components/record/record-view";
 
-export const metadata: Metadata = { title: "Registra sessione" };
+export const metadata: Metadata = { title: "Registrazione" };
 
 export default function RecordPage() {
   return <RecordView />;

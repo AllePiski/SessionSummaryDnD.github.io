@@ -2,8 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { toast } from "sonner";
-import { Check, Crown, FileAudio, Plus, TriangleAlert, Users } from "lucide-react";
+import { Check, Crown, FileAudio, Plus, RotateCcw, TriangleAlert, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -20,7 +19,7 @@ import { useClientValue } from "@/hooks/use-client-value";
 import { useCharacters, useSetting, useTranscription } from "@/hooks/use-data";
 import { audioFileName, isRecordingSupported, pickMimeType } from "@/lib/audio";
 import { characterSubtitle, splitByKind } from "@/lib/characters";
-import { defaultSessionTitle, todayISO } from "@/lib/format";
+import { defaultSessionTitle, plural, todayISO } from "@/lib/format";
 import { getRecordingEngine } from "@/lib/recording-engine";
 import { createSession, deleteSession, requestPersistentStorage, setSetting } from "@/lib/repo";
 import type { Character } from "@/lib/types";
@@ -43,6 +42,7 @@ export function SessionSetup() {
   const [deviceId, setDeviceId] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
   const [starting, setStarting] = useState(false);
+  const [startError, setStartError] = useState<string | null>(null);
 
   if (characters === undefined) return <PageLoading />;
 
@@ -80,6 +80,7 @@ export function SessionSetup() {
   async function start() {
     if (!master) return;
     setStarting(true);
+    setStartError(null);
     const session = await createSession({
       date,
       title: sessionTitle,
@@ -101,13 +102,13 @@ export function SessionSetup() {
       void requestPersistentStorage();
     } catch (error) {
       await deleteSession(session.id);
-      toast.error(error instanceof Error ? error.message : "Impossibile avviare la registrazione.");
+      setStartError(error instanceof Error ? error.message : "Impossibile avviare la registrazione.");
       setStarting(false);
     }
   }
 
   return (
-    <div className="mx-auto max-w-6xl">
+    <div className="mx-auto max-w-6xl pb-28 md:pb-0">
       <PageHeader
         title="Nuova sessione"
         description="Scegli chi gioca oggi, controlla il microfono e avvia la registrazione."
@@ -169,7 +170,7 @@ export function SessionSetup() {
                 );
               })}
               <Button variant="outline" size="sm" className="h-9 rounded-full" onClick={() => setAdding(true)}>
-                <Plus /> Nuovo personaggio
+                <Plus /> Nuovo PNG
               </Button>
             </CardContent>
           </Card>
@@ -252,21 +253,37 @@ export function SessionSetup() {
             </CardContent>
           </Card>
 
-          <Button
-            size="lg"
-            className="h-14 gap-3 rounded-xl bg-rec text-base text-white shadow-lg shadow-rec/25 hover:bg-rec/90"
-            onClick={() => void start()}
-            disabled={starting || !support.recording}
-          >
-            <span className="size-3 rounded-full bg-white" />
-            {starting ? "Avvio…" : "Inizia registrazione"}
-          </Button>
+          {startError && (
+            <div role="alert" className="grid gap-2 rounded-xl border border-destructive/40 bg-destructive/10 p-3 text-sm">
+              <p className="flex gap-2">
+                <TriangleAlert className="mt-0.5 size-4 shrink-0 text-destructive" />
+                {startError}
+              </p>
+              <Button variant="outline" size="sm" className="w-fit" onClick={() => void start()} disabled={starting}>
+                <RotateCcw /> Riprova
+              </Button>
+            </div>
+          )}
+          {/* su telefono il pulsante resta fisso in basso, sopra le schede */}
+          <div className="fixed inset-x-0 bottom-0 z-20 grid gap-1.5 border-t bg-background/95 p-3 backdrop-blur md:static md:z-auto md:border-0 md:bg-transparent md:p-0 md:backdrop-blur-none">
+            <Button
+              size="lg"
+              className="h-14 gap-3 rounded-xl bg-rec text-base text-white shadow-lg shadow-rec/25 hover:bg-rec/90"
+              onClick={() => void start()}
+              disabled={starting || !support.recording}
+            >
+              <span className="size-3 rounded-full bg-white" />
+              {starting ? "Avvio…" : "Inizia a registrare"}
+            </Button>
+            <p className="text-center text-xs text-muted-foreground" aria-live="polite">
+              {starting
+                ? "Se il browser lo chiede, consenti l'accesso al microfono."
+                : `${plural(participantIds.length, "partecipante", "partecipanti")} · il master parla per primo`}
+            </p>
+          </div>
           {!support.recording && (
             <p className="text-sm text-destructive">Questo browser non permette di registrare audio.</p>
           )}
-          <p className="text-center text-xs text-muted-foreground">
-            {participantIds.length} partecipanti · il master parla per primo
-          </p>
         </div>
       </div>
 

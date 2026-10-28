@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import Link from "next/link";
-import { ArrowRight, AudioLines, Dices, Mic, ScrollText, Users } from "lucide-react";
+import { ArrowRight, AudioLines, Dices, MessagesSquare, Mic, ScrollText, UserRoundX, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { CharacterAvatar } from "@/components/avatars/character-avatar";
@@ -109,7 +109,7 @@ export function DashboardView() {
                 className="h-14 gap-3 rounded-xl bg-rec px-6 text-base text-white shadow-lg shadow-rec/25 hover:bg-rec/90"
               >
                 <Link href="/record">
-                  <Mic className="size-5" /> Inizia una nuova sessione
+                  <Mic className="size-5" /> Nuova sessione
                 </Link>
               </Button>
             )}
@@ -122,23 +122,26 @@ export function DashboardView() {
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <StatTile label="Sessioni registrate" value={String(totals.count)} />
-        <StatTile label="Tempo di gioco registrato" value={totals.durationMs ? formatDuration(totals.durationMs) : "—"} />
-        <StatTile label="Turni di parola" value={totals.turns.toLocaleString("it-IT")} />
-        <StatTile
-          label="Ultima sessione"
-          value={totals.last ? formatShortDate(totals.last.date) : "—"}
-          detail={totals.last?.title}
-        />
-      </div>
+      {sessions.length === 0 ? (
+        <FirstSessionGuide />
+      ) : (
+        <>
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <StatTile label="Sessioni registrate" value={String(totals.count)} />
+          <StatTile label="Tempo di gioco registrato" value={totals.durationMs ? formatDuration(totals.durationMs) : "—"} />
+          <StatTile label="Turni di parola" value={totals.turns.toLocaleString("it-IT")} />
+          <StatTile
+            label="Ultima sessione"
+            value={totals.last ? formatShortDate(totals.last.date) : "—"}
+            detail={totals.last?.title}
+          />
+        </div>
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
-        <Card>
-          <CardHeader>
-            <CardTitle>Sessioni recenti</CardTitle>
-            <CardDescription>Apri una sessione per riascoltarla e leggerne la sceneggiatura.</CardDescription>
-            {sessions.length > 0 && (
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
+          <Card>
+            <CardHeader>
+              <CardTitle>Sessioni recenti</CardTitle>
+              <CardDescription>Apri una sessione per riascoltarla e leggerne la sceneggiatura.</CardDescription>
               <CardAction>
                 <Button asChild variant="ghost" size="sm">
                   <Link href="/sessions">
@@ -146,36 +149,62 @@ export function DashboardView() {
                   </Link>
                 </Button>
               </CardAction>
-            )}
-          </CardHeader>
-          <CardContent className="grid gap-3">
-            {sessions.length === 0 ? (
-              <div className="grid justify-items-center gap-2 rounded-xl border border-dashed py-10 text-center">
-                <ScrollText className="size-8 text-muted-foreground" />
-                <p className="font-medium">Nessuna sessione ancora</p>
-                <p className="max-w-xs text-sm text-muted-foreground">
-                  Avvia la registrazione all&apos;inizio della serata e seleziona chi sta parlando.
-                </p>
-              </div>
-            ) : (
-              sessions.slice(0, 5).map((s) => <SessionRow key={s.id} session={s} characters={characterMap} />)
-            )}
-          </CardContent>
-        </Card>
+            </CardHeader>
+            <CardContent className="grid gap-3">
+              {sessions.slice(0, 5).map((s) => (
+                <SessionRow key={s.id} session={s} characters={characterMap} />
+              ))}
+            </CardContent>
+          </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <AudioLines className="size-4 text-muted-foreground" /> Chi parla di più
-            </CardTitle>
-            <CardDescription>Tempo di parola del party in tutte le sessioni.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <TalkTime stats={totals.talk} characters={characterMap} totalMs={totals.durationMs} />
-          </CardContent>
-        </Card>
-      </div>
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <AudioLines className="size-4 text-muted-foreground" /> Chi parla di più
+              </CardTitle>
+              <CardDescription>Tempo di parola del party in tutte le sessioni.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <TalkTime stats={totals.talk} characters={characterMap} totalMs={totals.durationMs} />
+            </CardContent>
+          </Card>
+        </div>
+        </>
+      )}
     </div>
+  );
+}
+
+/** Prima della prima registrazione: come si usa, invece di numeri a zero. */
+function FirstSessionGuide() {
+  const tips = [
+    { icon: Mic, title: "Tocca chi parla", text: "Durante la sessione tocca l'avatar di chi sta parlando: si illumina e il turno è suo." },
+    { icon: MessagesSquare, title: "Discussione", text: "Quando parlano in tanti, premi Discussione e scegli chi partecipa." },
+    { icon: UserRoundX, title: "Nessuno", text: "Per le pause e le chiacchiere fuori gioco." },
+  ];
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>La tua prima sessione</CardTitle>
+        <CardDescription>
+          A fine serata trovi audio, timeline e sceneggiatura. Il riconoscimento vocale è facoltativo: lo accendi dalla
+          barra laterale.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="grid gap-4 sm:grid-cols-3">
+        {tips.map((t) => (
+          <div key={t.title} className="flex gap-3">
+            <span className="grid size-9 shrink-0 place-items-center rounded-full bg-primary/15 text-primary">
+              <t.icon className="size-4" />
+            </span>
+            <p className="text-sm">
+              <span className="font-semibold">{t.title}</span>
+              <span className="block text-muted-foreground">{t.text}</span>
+            </p>
+          </div>
+        ))}
+      </CardContent>
+    </Card>
   );
 }
 

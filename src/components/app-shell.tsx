@@ -32,12 +32,13 @@ import { ElapsedTime } from "@/components/record/elapsed-time";
 import { SettingsDialog } from "@/components/settings-dialog";
 import { useCharacters, useRecordingState, useRecordingStatus, useTranscription } from "@/hooks/use-data";
 import { formatClock } from "@/lib/format";
+import { splitByKind } from "@/lib/characters";
 import { getRecordingEngine } from "@/lib/recording-engine";
 import { recoverInterruptedSessions } from "@/lib/repo";
 
 const NAV = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/record", label: "Registra sessione", icon: Mic },
+  { href: "/record", label: "Registrazione", icon: Mic },
   { href: "/sessions", label: "Archivio sessioni", icon: Archive },
   { href: "/party", label: "Party", icon: Users },
   { href: "/dice", label: "Tiro dei dadi", icon: Dices },
@@ -49,7 +50,7 @@ function normalize(path: string) {
 
 const TITLES: Record<string, string> = {
   "/": "Dashboard",
-  "/record": "Registra sessione",
+  "/record": "Registrazione",
   "/sessions": "Archivio sessioni",
   "/session": "Sessione",
   "/party": "Party",
@@ -83,7 +84,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 function AppSidebar({ pathname }: { pathname: string }) {
   const { setOpenMobile } = useSidebar();
   const characters = useCharacters();
-  const party = (characters ?? []).filter((c) => c.kind === "pc");
+  const { master, pcs } = splitByKind(characters ?? []);
+  // master in testa: la lista porta alla pagina Party
 
   return (
     <Sidebar collapsible="icon" className="no-print">
@@ -96,7 +98,7 @@ function AppSidebar({ pathname }: { pathname: string }) {
           <D20Logo className="size-8 shrink-0" />
           <div className="grid leading-tight group-data-[collapsible=icon]:hidden">
             <span className="font-display text-[15px] font-bold tracking-wide">Cronache del Tavolo</span>
-            <span className="text-[11px] text-muted-foreground">Session Summary · D&amp;D</span>
+            <span className="text-[11px] text-muted-foreground">Diario delle sessioni di D&amp;D</span>
           </div>
         </Link>
       </SidebarHeader>
@@ -121,18 +123,22 @@ function AppSidebar({ pathname }: { pathname: string }) {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
-        {party.length > 0 && (
+        {pcs.length > 0 && (
           <SidebarGroup className="group-data-[collapsible=icon]:hidden">
             <SidebarGroupLabel>Il party</SidebarGroupLabel>
             <SidebarGroupContent>
-              <ul className="grid gap-1 px-2">
-                {party.map((c) => (
-                  <li key={c.id} className="flex items-center gap-2 text-sm">
-                    <CharacterAvatar character={c} showColor ringClassName="ring-sidebar" className="size-6" />
-                    <span className="truncate">{c.name}</span>
-                  </li>
+              <SidebarMenu>
+                {[...(master ? [master] : []), ...pcs].map((c) => (
+                  <SidebarMenuItem key={c.id}>
+                    <SidebarMenuButton asChild size="sm" className="[&_svg]:size-5">
+                      <Link href="/party" onClick={() => setOpenMobile(false)}>
+                        <CharacterAvatar character={c} showColor ringClassName="ring-sidebar" className="size-5" />
+                        <span>{c.name}</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
                 ))}
-              </ul>
+              </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>
         )}

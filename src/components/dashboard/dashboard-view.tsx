@@ -2,12 +2,11 @@
 
 import { useMemo } from "react";
 import Link from "next/link";
-import { ArrowRight, AudioLines, Mic, ScrollText, Users } from "lucide-react";
+import { ArrowRight, AudioLines, Dices, Mic, ScrollText, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { CharacterAvatar } from "@/components/avatars/character-avatar";
 import { D20Logo } from "@/components/app-shell";
-import { DiceRoller } from "@/components/dice/dice-roller";
 import { PageLoading } from "@/components/page-header";
 import { ElapsedTime } from "@/components/record/elapsed-time";
 import { SessionRow } from "@/components/sessions/sessions-view";
@@ -138,8 +137,6 @@ export function DashboardView() {
         />
       </div>
 
-      <DiceRoller />
-
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
         <Card>
           <CardHeader>
@@ -233,11 +230,18 @@ function Welcome() {
           </Card>
         ))}
       </div>
-      <Button asChild size="lg" className="h-12 px-6 text-base">
-        <Link href="/party">
-          Crea il party <ArrowRight />
-        </Link>
-      </Button>
+      <div className="grid justify-items-center gap-3">
+        <Button asChild size="lg" className="h-12 px-6 text-base">
+          <Link href="/party">
+            Crea il party <ArrowRight />
+          </Link>
+        </Button>
+        <Button asChild variant="ghost" size="sm">
+          <Link href="/dice">
+            <Dices /> Vuoi solo tirare i dadi?
+          </Link>
+        </Button>
+      </div>
     </div>
   );
 }

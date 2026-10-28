@@ -5,10 +5,11 @@ import { useLiveQuery } from "dexie-react-hooks";
 import { ChevronsDown, ChevronsUp, Dices, History, Minus, Plus, RotateCcw, Trash2, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DieFace, RollingDie } from "./die-face";
+import { useCharacters } from "@/hooks/use-data";
 import { db } from "@/lib/db";
 import {
   DIE_SIDES,
@@ -50,15 +51,22 @@ interface PlannedDie {
   discarded?: boolean;
 }
 
-/** Sezione della dashboard per tirare i dadi, anche misti e con uno scopo per gruppo. */
+/**
+ * Tiro dei dadi, anche misti e con uno scopo per gruppo. Usabile da tutti:
+ * con un party lancio e storico restano salvati, senza party no.
+ */
 export function DiceRoller() {
+  const characters = useCharacters();
   const stored = useLiveQuery(async () => (await db.settings.get(DICE_KEY)) ?? null, []);
-  if (stored === undefined) {
+  if (stored === undefined || characters === undefined) {
     return <Card className="h-80 animate-pulse" aria-busy />;
   }
-  const saved = stored?.value as SavedDice | undefined;
+  const persist = characters.some((c) => c.kind === "pc");
+  const saved = persist ? (stored?.value as SavedDice | undefined) : undefined;
   return (
     <DiceRollerBody
+      key={persist ? "saved" : "temporary"}
+      persist={persist}
       initialGroups={saved?.groups?.length ? saved.groups : [newGroup(20)]}
       initialHistory={saved?.history ?? []}
     />
@@ -102,7 +110,15 @@ function diceSize(count: number) {
   return "size-9";
 }
 
-function DiceRollerBody({ initialGroups, initialHistory }: { initialGroups: DiceGroup[]; initialHistory: RollResult[] }) {
+function DiceRollerBody({
+  persist,
+  initialGroups,
+  initialHistory,
+}: {
+  persist: boolean;
+  initialGroups: DiceGroup[];
+  initialHistory: RollResult[];
+}) {
   const [groups, setGroups] = useState(initialGroups);
   const [history, setHistory] = useState(initialHistory);
   const [roll, setRoll] = useState<RollResult | null>(initialHistory[0] ?? null);
@@ -112,11 +128,12 @@ function DiceRollerBody({ initialGroups, initialHistory }: { initialGroups: Dice
   const [animated, setAnimated] = useState(false);
   const settleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // salvataggio (con un piccolo ritardo mentre si scrive)
+  // salvataggio solo se c'è un party (con un piccolo ritardo mentre si scrive)
   useEffect(() => {
+    if (!persist) return;
     const t = setTimeout(() => void setSetting(DICE_KEY, { groups, history } satisfies SavedDice), 400);
     return () => clearTimeout(t);
-  }, [groups, history]);
+  }, [persist, groups, history]);
 
   useEffect(
     () => () => {
@@ -194,16 +211,7 @@ function DiceRollerBody({ initialGroups, initialHistory }: { initialGroups: Dice
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Dices className="size-4 text-muted-foreground" /> Tiro dei dadi
-        </CardTitle>
-        <CardDescription>
-          Scegli quanti dadi e di che tipo, anche misti. Se vuoi, indica a cosa serve ogni gruppo (es. 1d8 Fuoco + 1d8
-          Ghiaccio): i totali restano separati.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_17rem]">
+      <CardContent className="grid gap-6 py-2 lg:grid-cols-[minmax(0,1fr)_17rem]">
         <div className="grid min-w-0 content-start gap-4">
           <div className="flex flex-wrap items-center gap-1.5">
             <span className="mr-1 text-sm text-muted-foreground">Aggiungi</span>
@@ -331,6 +339,7 @@ function DiceRollerBody({ initialGroups, initialHistory }: { initialGroups: Dice
         </div>
 
         <RollHistory
+          persist={persist}
           history={history}
           onRepeat={(r) => !animating && repeat(r)}
           onClear={() => setHistory([])}
@@ -511,10 +520,12 @@ function RollSummary({ roll }: { roll: RollResult }) {
 }
 
 function RollHistory({
+  persist,
   history,
   onRepeat,
   onClear,
 }: {
+  persist: boolean;
   history: RollResult[];
   onRepeat: (roll: RollResult) => void;
   onClear: () => void;
@@ -531,6 +542,11 @@ function RollHistory({
           </Button>
         )}
       </div>
+      {!persist && (
+        <p className="rounded-lg bg-muted/60 p-2.5 text-xs text-muted-foreground">
+          Senza party i lanci non vengono salvati: spariscono quando lasci la pagina.
+        </p>
+      )}
       {history.length === 0 ? (
         <p className="text-sm text-muted-foreground">Nessun lancio ancora.</p>
       ) : (

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useTheme } from "next-themes";
 import { toast } from "sonner";
-import { Archive, AudioLines, LayoutDashboard, Mic, Moon, Sun, Users } from "lucide-react";
+import { Archive, AudioLines, Dices, LayoutDashboard, Mic, Moon, Sun, Users } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -39,6 +39,7 @@ const NAV = [
   { href: "/record", label: "Registra sessione", icon: Mic },
   { href: "/sessions", label: "Archivio sessioni", icon: Archive },
   { href: "/party", label: "Party", icon: Users },
+  { href: "/dice", label: "Tiro dei dadi", icon: Dices },
 ];
 
 function normalize(path: string) {
@@ -51,6 +52,7 @@ const TITLES: Record<string, string> = {
   "/sessions": "Archivio sessioni",
   "/session": "Sessione",
   "/party": "Party",
+  "/dice": "Tiro dei dadi",
 };
 
 export function AppShell({ children }: { children: React.ReactNode }) {

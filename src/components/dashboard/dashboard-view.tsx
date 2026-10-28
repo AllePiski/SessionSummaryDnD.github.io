@@ -12,16 +12,16 @@ import { StatTile } from "@/components/stat-tile";
 import { ElapsedTime } from "@/components/record/elapsed-time";
 import { SessionRow } from "@/components/sessions/sessions-view";
 import { TalkTime } from "@/components/session/talk-time";
-import { useCharacterMap, useCharacters, useRecording, useSessions } from "@/hooks/use-data";
+import { useCharacters, useRecordingStatus, useSessions } from "@/hooks/use-data";
 import { characterSubtitle, splitByKind } from "@/lib/characters";
 import { formatDuration, formatShortDate } from "@/lib/format";
 import { speakerStats, type SpeakerStat } from "@/lib/screenplay";
 
 export function DashboardView() {
-  const characters = useCharacters();
+  const allCharacters = useCharacters(true);
   const sessions = useSessions();
-  const characterMap = useCharacterMap();
-  const { state } = useRecording();
+  const characterMap = useMemo(() => new Map((allCharacters ?? []).map((c) => [c.id, c])), [allCharacters]);
+  const status = useRecordingStatus();
 
   const totals = useMemo(() => {
     const done = (sessions ?? []).filter((s) => s.status !== "recording");
@@ -56,12 +56,13 @@ export function DashboardView() {
     };
   }, [sessions, characterMap]);
 
-  if (characters === undefined || sessions === undefined) return <PageLoading />;
+  if (allCharacters === undefined || sessions === undefined) return <PageLoading />;
+  const characters = allCharacters.filter((c) => !c.archived);
 
   const { master, pcs: party } = splitByKind(characters);
   if (party.length === 0) return <Welcome />;
 
-  const recording = state.status !== "idle";
+  const recording = status !== "idle";
 
   return (
     <div className="mx-auto grid max-w-7xl gap-6">

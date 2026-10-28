@@ -3,7 +3,7 @@
 import { useCallback, useMemo, useSyncExternalStore } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { db } from "@/lib/db";
-import { getRecordingEngine, IDLE_ENGINE_STATE } from "@/lib/recording-engine";
+import { getRecordingEngine, IDLE_ENGINE_STATE, type EngineState } from "@/lib/recording-engine";
 import { setSetting } from "@/lib/repo";
 import { DEFAULT_LANG, DEFAULT_TRANSCRIBE, SETTING_LANG, SETTING_TRANSCRIBE } from "@/lib/settings";
 import { isSpeechRecognitionSupported } from "@/lib/transcriber";
@@ -45,10 +45,22 @@ export function useSetting<T>(key: string, fallback: T): T {
   return row ? (row.value as T) : fallback;
 }
 
-export function useRecording() {
+/**
+ * Una parte dello stato del motore di registrazione. Il componente si
+ * ri-renderizza solo quando cambia il valore scelto: il selettore deve
+ * restituire un campo dello stato o un valore primitivo, mai un oggetto nuovo.
+ */
+export function useRecordingState<T>(select: (state: EngineState) => T): T {
   const engine = getRecordingEngine();
-  const state = useSyncExternalStore(engine.subscribe, engine.getSnapshot, () => IDLE_ENGINE_STATE);
-  return { state, engine };
+  return useSyncExternalStore(
+    engine.subscribe,
+    () => select(engine.getSnapshot()),
+    () => select(IDLE_ENGINE_STATE),
+  );
+}
+
+export function useRecordingStatus() {
+  return useRecordingState((s) => s.status);
 }
 
 /**
@@ -66,5 +78,9 @@ export function useTranscription() {
     },
     [lang],
   );
-  return { enabled: enabled && supported, supported, lang, setEnabled };
+  const setLang = useCallback((value: string) => {
+    void setSetting(SETTING_LANG, value);
+    getRecordingEngine().setLanguage(value);
+  }, []);
+  return { enabled: enabled && supported, supported, lang, setEnabled, setLang };
 }

@@ -29,16 +29,28 @@ export function LevelMeter({
       return;
     }
     let raf = 0;
+    let idle: ReturnType<typeof setTimeout> | undefined;
     let smooth = 0;
+    let lastLit = -1;
     const loop = () => {
-      const level = getLevel();
-      smooth = Math.max(level, smooth * 0.88);
+      // nascosto (es. su mobile): si ricontrolla ogni tanto invece che a ogni frame
+      if (root.offsetParent === null) {
+        idle = setTimeout(loop, 1000);
+        return;
+      }
+      smooth = Math.max(getLevel(), smooth * 0.88);
       const lit = Math.round(smooth * bars);
-      cells.forEach((c, i) => (c.dataset.on = String(i < lit)));
+      if (lit !== lastLit) {
+        cells.forEach((c, i) => (c.dataset.on = String(i < lit)));
+        lastLit = lit;
+      }
       raf = requestAnimationFrame(loop);
     };
     raf = requestAnimationFrame(loop);
-    return () => cancelAnimationFrame(raf);
+    return () => {
+      cancelAnimationFrame(raf);
+      clearTimeout(idle);
+    };
   }, [active, getLevel, bars]);
 
   return (
@@ -47,9 +59,9 @@ export function LevelMeter({
         const pos = i / (bars - 1);
         const tone =
           pos > 0.9
-            ? "data-[on=true]:bg-[#d03b3b]"
+            ? "data-[on=true]:bg-destructive"
             : pos > 0.72
-              ? "data-[on=true]:bg-[#fab219]"
+              ? "data-[on=true]:bg-warning"
               : "data-[on=true]:bg-primary";
         return (
           <span

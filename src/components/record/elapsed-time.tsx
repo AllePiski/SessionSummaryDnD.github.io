@@ -1,15 +1,16 @@
 "use client";
 
 import { useEffect, useReducer } from "react";
-import { useRecording } from "@/hooks/use-data";
+import { useRecordingStatus } from "@/hooks/use-data";
+import { getRecordingEngine } from "@/lib/recording-engine";
 import { formatClock } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 /** Cronometro della registrazione: si aggiorna da solo senza ri-renderizzare la pagina. */
 export function ElapsedTime({ className }: { className?: string }) {
-  const { state, engine } = useRecording();
+  const status = useRecordingStatus();
   const [, tick] = useReducer((n: number) => n + 1, 0);
-  const running = state.status === "recording";
+  const running = status === "recording";
 
   useEffect(() => {
     if (!running) return;
@@ -17,6 +18,6 @@ export function ElapsedTime({ className }: { className?: string }) {
     return () => clearInterval(id);
   }, [running]);
 
-  const ms = state.status === "idle" ? 0 : engine.elapsed();
+  const ms = status === "idle" ? 0 : getRecordingEngine().elapsed();
   return <span className={cn("tabular", className)}>{formatClock(ms)}</span>;
 }

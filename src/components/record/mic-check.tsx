@@ -25,8 +25,11 @@ export function MicCheck({
   const ctxRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const bufferRef = useRef<Float32Array<ArrayBuffer> | null>(null);
+  // ogni nuova prova (o stop) invalida le richieste ancora in attesa del permesso
+  const requestRef = useRef(0);
 
   const stopTest = useCallback(() => {
+    requestRef.current++;
     streamRef.current?.getTracks().forEach((t) => t.stop());
     streamRef.current = null;
     void ctxRef.current?.close().catch(() => {});
@@ -38,11 +41,17 @@ export function MicCheck({
   const startTest = useCallback(
     async (id: string) => {
       stopTest();
+      const request = requestRef.current;
       setError(null);
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
           audio: id ? { deviceId: { exact: id } } : true,
         });
+        // nel frattempo la prova è stata fermata o il componente smontato: niente microfono orfano
+        if (request !== requestRef.current) {
+          stream.getTracks().forEach((t) => t.stop());
+          return;
+        }
         streamRef.current = stream;
         const ctx = new AudioContext();
         const analyser = ctx.createAnalyser();
@@ -53,7 +62,7 @@ export function MicCheck({
         bufferRef.current = new Float32Array(analyser.fftSize);
         setTesting(true);
         const list = await navigator.mediaDevices.enumerateDevices();
-        setDevices(list.filter((d) => d.kind === "audioinput" && d.deviceId));
+        if (request === requestRef.current) setDevices(list.filter((d) => d.kind === "audioinput" && d.deviceId));
       } catch (e) {
         setError(describeMicError(e));
       }

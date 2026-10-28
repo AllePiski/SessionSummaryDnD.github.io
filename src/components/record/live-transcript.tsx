@@ -129,7 +129,7 @@ export function TurnLog({
           <li>
             <GroupHeader ids={currentTurn.speakerIds} t={currentTurn.start} characters={characters} />
             <p className="mt-0.5 flex items-center gap-1.5 pl-9 text-xs font-medium">
-              <span className="rec-dot size-1.5 rounded-full bg-rec" /> Sta parlando
+              <span className="rec-dot size-1.5 rounded-full bg-rec-bright" /> Sta parlando
             </p>
           </li>
         )}

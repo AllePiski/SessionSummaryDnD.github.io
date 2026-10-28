@@ -5,11 +5,25 @@ import { sameSpeakers, uid } from "./format";
 import { LiveTranscriber, isSpeechRecognitionSupported, type SpeechStatus } from "./transcriber";
 import type { TranscriptLine, Turn } from "./types";
 
-type EngineStatus = "idle" | "starting" | "recording" | "paused" | "stopping";
+/** `save-failed`: registrazione finita ma salvataggio non riuscito (si può riprovare o scaricare l'audio). */
+type EngineStatus = "idle" | "starting" | "recording" | "paused" | "stopping" | "save-failed";
+
+/** Come si è chiusa l'ultima registrazione (per avvisare se non l'ha fermata l'utente). */
+export interface LastStop {
+  sessionId: string;
+  reason: "user" | "mic-ended";
+  durationMs: number;
+}
 
 export interface EngineState {
   status: EngineStatus;
   sessionId: string | null;
+  title: string;
+  /** data di gioco, YYYY-MM-DD */
+  date: string;
+  /** Date.now() dell'inizio della pausa in corso */
+  pausedAt: number | null;
+  lastStop: LastStop | null;
   participantIds: string[];
   activeSpeakerIds: string[];
   /** turni già chiusi */
@@ -25,6 +39,8 @@ export interface EngineState {
 
 interface StartOptions {
   sessionId: string;
+  title: string;
+  date: string;
   participantIds: string[];
   initialSpeakerIds: string[];
   language: string;
@@ -41,6 +57,10 @@ function initialState(): EngineState {
   return {
     status: "idle",
     sessionId: null,
+    title: "",
+    date: "",
+    pausedAt: null,
+    lastStop: null,
     participantIds: [],
     activeSpeakerIds: [],
     turns: [],
@@ -62,6 +82,16 @@ function polish(text: string): string {
 interface Phrase {
   start: number;
   last: number;
+}
+
+/** Dati finali calcolati al primo tentativo di stop (riusati se si riprova il salvataggio). */
+interface Finalized {
+  sessionId: string;
+  durationMs: number;
+  lines: TranscriptLine[];
+  turns: Turn[];
+  reason: LastStop["reason"];
+  blob?: Blob;
 }
 
 /**
@@ -87,6 +117,10 @@ class RecordingEngine {
   private saveTimer: ReturnType<typeof setTimeout> | null = null;
   private heartbeat: ReturnType<typeof setInterval> | null = null;
   private wakeLock: WakeLockSentinel | null = null;
+  private language = "it-IT";
+  /** battute cambiate dall'ultimo salvataggio (i turni si salvano sempre: sono pochi) */
+  private linesDirty = false;
+  private finalized: Finalized | null = null;
 
   subscribe = (listener: () => void) => {
     this.listeners.add(listener);
@@ -120,7 +154,15 @@ class RecordingEngine {
 
   async start(opts: StartOptions) {
     if (this.state.status !== "idle") throw new Error("C'è già una registrazione in corso.");
-    this.set({ ...initialState(), status: "starting", sessionId: opts.sessionId, participantIds: opts.participantIds });
+    this.set({
+      ...initialState(),
+      status: "starting",
+      sessionId: opts.sessionId,
+      title: opts.title,
+      date: opts.date,
+      participantIds: opts.participantIds,
+    });
+    this.language = opts.language;
 
     try {
       this.stream = await navigator.mediaDevices.getUserMedia({
@@ -139,22 +181,24 @@ class RecordingEngine {
 
     const mimeType = pickMimeType();
     try {
-      this.recorder = new MediaRecorder(this.stream, {
-        ...(mimeType ? { mimeType } : {}),
-        audioBitsPerSecond: 64_000,
-      });
+      this.recorder = createRecorder(this.stream, mimeType);
+      this.chunks = [];
+      this.seq = 0;
+      this.recorder.ondataavailable = (event) => this.onData(event.data);
+      this.recorder.start(TIMESLICE_MS);
     } catch {
-      this.recorder = new MediaRecorder(this.stream);
+      this.stream.getTracks().forEach((t) => t.stop());
+      this.stream = null;
+      this.recorder = null;
+      this.set(initialState());
+      throw new Error("Questo browser non riesce a registrare dal microfono scelto.");
     }
-    this.chunks = [];
-    this.seq = 0;
-    this.recorder.ondataavailable = (event) => this.onData(event.data);
     this.stream.getAudioTracks().forEach((track) => {
+      // microfono scollegato: si salva quello che c'è e si avvisa l'utente
       track.onended = () => {
-        if (this.isActive()) void this.stop();
+        if (this.isActive()) void this.stop("mic-ended").catch(() => {});
       };
     });
-    this.recorder.start(TIMESLICE_MS);
 
     try {
       this.audioCtx = new AudioContext();
@@ -176,7 +220,6 @@ class RecordingEngine {
       currentTurn: initial.length ? { speakerIds: initial, start: 0 } : null,
     });
 
-    this.set({ speech: "off" });
     if (opts.transcribe) this.setTranscription(true, opts.language);
 
     void this.acquireWakeLock();
@@ -201,9 +244,18 @@ class RecordingEngine {
     this.scheduleSave();
   }
 
+  /** Cambia la lingua del riconoscimento vocale (lo riavvia se è acceso). */
+  setLanguage(language: string) {
+    this.language = language;
+    if (!this.transcriber) return;
+    this.setTranscription(false, language);
+    this.setTranscription(true, language);
+  }
+
   /** Accende o spegne il riconoscimento vocale, anche a registrazione in corso. */
-  setTranscription(enabled: boolean, language: string) {
+  setTranscription(enabled: boolean, language = this.language) {
     if (!this.isActive()) return;
+    this.language = language;
     if (!enabled) {
       this.transcriber?.stop("off");
       this.transcriber = null;
@@ -242,7 +294,7 @@ class RecordingEngine {
     this.accumulated = this.elapsed();
     this.runningSince = null;
     this.transcriber?.stop("paused");
-    this.set({ status: "paused", interim: null });
+    this.set({ status: "paused", interim: null, pausedAt: Date.now() });
     this.scheduleSave(true);
   }
 
@@ -251,16 +303,84 @@ class RecordingEngine {
     this.recorder?.resume();
     this.runningSince = performance.now();
     this.transcriber?.start();
-    this.set({ status: "recording" });
+    this.set({ status: "recording", pausedAt: null });
   }
 
-  /** Chiude la sessione e salva audio + trascrizione. Ritorna l'id della sessione. */
-  async stop(): Promise<string | null> {
-    if (!this.isActive()) return null;
-    const sessionId = this.state.sessionId!;
-    const duration = Math.round(this.elapsed());
-    this.accumulated = duration;
+  /** L'audio non salvato dopo un errore di salvataggio, da scaricare a mano. */
+  unsavedAudio(): Blob | null {
+    if (this.state.status !== "save-failed") return null;
+    return this.finalized?.blob ?? new Blob(this.chunks, { type: this.state.mimeType });
+  }
+
+  /** Dimentica l'ultimo stop dopo averlo notificato. */
+  clearLastStop() {
+    if (this.state.lastStop) this.set({ lastStop: null });
+  }
+
+  /**
+   * Chiude la sessione e salva audio + trascrizione; ritorna l'id della sessione.
+   * Se il salvataggio fallisce lo stato diventa `save-failed` e si può richiamare
+   * `stop()` per riprovare (i dati restano in memoria).
+   */
+  async stop(reason: LastStop["reason"] = "user"): Promise<string | null> {
+    if (!this.isActive() && this.state.status !== "save-failed") return null;
+    const final = this.finalized ?? this.finalize(reason);
+    this.set({ status: "stopping", lines: final.lines, turns: final.turns, currentTurn: null, interim: null });
+
+    try {
+      if (!final.blob) {
+        const raw = await this.stopRecorder();
+        final.blob = raw;
+        if (raw.type.includes("webm")) {
+          try {
+            final.blob = await fixWebmDuration(raw, final.durationMs, { logger: false });
+          } catch {
+            // si tiene il file così com'è
+          }
+        }
+        this.releaseDevices();
+      }
+      const blob = final.blob;
+      const mimeType = blob.type || this.state.mimeType || "audio/webm";
+      await db.transaction("rw", db.sessions, db.audio, db.chunks, async () => {
+        await db.audio.put({ sessionId: final.sessionId, blob, mimeType });
+        await db.sessions.update(final.sessionId, {
+          status: "completed",
+          durationMs: final.durationMs,
+          turns: final.turns.filter((t) => t.end - t.start >= 250),
+          lines: final.lines,
+          participantIds: this.state.participantIds,
+          audioMimeType: mimeType,
+          audioSize: blob.size,
+          updatedAt: Date.now(),
+        });
+        await db.chunks.where("sessionId").equals(final.sessionId).delete();
+      });
+    } catch (error) {
+      this.set({ status: "save-failed" });
+      throw error;
+    }
+
+    this.teardown();
+    this.finalized = null;
+    this.set({
+      ...initialState(),
+      lastStop: { sessionId: final.sessionId, reason: final.reason, durationMs: final.durationMs },
+    });
+    return final.sessionId;
+  }
+
+  /** Ferma il cronometro e chiude turni e battute (una volta sola per sessione). */
+  private finalize(reason: LastStop["reason"]): Finalized {
+    const durationMs = Math.round(this.elapsed());
+    this.accumulated = durationMs;
     this.runningSince = null;
+    if (this.saveTimer) clearTimeout(this.saveTimer);
+    this.saveTimer = null;
+    if (this.heartbeat) clearInterval(this.heartbeat);
+    this.heartbeat = null;
+    this.transcriber?.stop("off");
+    this.transcriber = null;
 
     // il testo ancora "provvisorio" viene tenuto come frase definitiva
     let lines = this.state.lines;
@@ -269,52 +389,18 @@ class RecordingEngine {
         ...lines,
         {
           id: uid(),
-          t: Math.max(0, duration - 2000),
+          t: Math.max(0, durationMs - 2000),
           text: polish(this.state.interim.text),
           speakerIds: this.state.interim.speakerIds,
         },
       ];
     }
     const turns = [...this.state.turns];
-    if (this.state.currentTurn && duration > this.state.currentTurn.start) {
-      turns.push({ ...this.state.currentTurn, end: duration });
+    if (this.state.currentTurn && durationMs > this.state.currentTurn.start) {
+      turns.push({ ...this.state.currentTurn, end: durationMs });
     }
-    this.set({ status: "stopping", lines, turns, currentTurn: null, interim: null });
-    if (this.saveTimer) clearTimeout(this.saveTimer);
-    this.saveTimer = null;
-
-    this.transcriber?.stop("off");
-    this.transcriber = null;
-
-    const raw = await this.stopRecorder();
-    let blob = raw;
-    if (raw.type.includes("webm")) {
-      try {
-        blob = await fixWebmDuration(raw, duration, { logger: false });
-      } catch {
-        blob = raw;
-      }
-    }
-    const mimeType = blob.type || this.state.mimeType || "audio/webm";
-
-    await db.transaction("rw", db.sessions, db.audio, db.chunks, async () => {
-      await db.audio.put({ sessionId, blob, mimeType });
-      await db.sessions.update(sessionId, {
-        status: "completed",
-        durationMs: duration,
-        turns: turns.filter((t) => t.end - t.start >= 250),
-        lines,
-        participantIds: this.state.participantIds,
-        audioMimeType: mimeType,
-        audioSize: blob.size,
-        updatedAt: Date.now(),
-      });
-      await db.chunks.where("sessionId").equals(sessionId).delete();
-    });
-
-    this.teardown();
-    this.set(initialState());
-    return sessionId;
+    this.finalized = { sessionId: this.state.sessionId!, durationMs, lines, turns, reason };
+    return this.finalized;
   }
 
   private onData(blob: Blob) {
@@ -371,6 +457,7 @@ class RecordingEngine {
       text: polish(clean),
       speakerIds: this.dominantSpeakers(start, end),
     };
+    this.linesDirty = true;
     this.set({ lines: [...this.state.lines, line], interim: null });
     this.scheduleSave();
   };
@@ -418,9 +505,12 @@ class RecordingEngine {
     if (!s.sessionId || (s.status !== "recording" && s.status !== "paused")) return;
     const now = Math.round(this.elapsed());
     const turns = s.currentTurn ? [...s.turns, { ...s.currentTurn, end: now }] : s.turns;
+    // le battute (la parte pesante) si riscrivono solo se sono cambiate
+    const lines = this.linesDirty ? { lines: s.lines } : {};
+    this.linesDirty = false;
     await db.sessions.update(s.sessionId, {
+      ...lines,
       turns,
-      lines: s.lines,
       participantIds: s.participantIds,
       durationMs: now,
       audioMimeType: s.mimeType,
@@ -444,28 +534,42 @@ class RecordingEngine {
   };
 
   private onBeforeUnload = (event: BeforeUnloadEvent) => {
-    if (this.isActive()) event.preventDefault();
+    const status = this.state.status;
+    if (this.isActive() || status === "stopping" || status === "save-failed") event.preventDefault();
   };
 
-  private teardown() {
-    if (this.heartbeat) clearInterval(this.heartbeat);
-    this.heartbeat = null;
+  /** Spegne microfono, analisi del livello e blocco dello schermo (idempotente). */
+  private releaseDevices() {
     this.stream?.getTracks().forEach((t) => {
       t.onended = null;
       t.stop();
     });
     this.stream = null;
-    this.recorder = null;
-    this.chunks = [];
     this.analyser = null;
     this.levelBuffer = null;
     void this.audioCtx?.close().catch(() => {});
     this.audioCtx = null;
-    this.phrases.clear();
     void this.wakeLock?.release().catch(() => {});
     this.wakeLock = null;
+  }
+
+  private teardown() {
+    if (this.heartbeat) clearInterval(this.heartbeat);
+    this.heartbeat = null;
+    this.releaseDevices();
+    this.recorder = null;
+    this.chunks = [];
+    this.phrases.clear();
     document.removeEventListener("visibilitychange", this.onVisibilityChange);
     window.removeEventListener("beforeunload", this.onBeforeUnload);
+  }
+}
+
+function createRecorder(stream: MediaStream, mimeType: string): MediaRecorder {
+  try {
+    return new MediaRecorder(stream, { ...(mimeType ? { mimeType } : {}), audioBitsPerSecond: 64_000 });
+  } catch {
+    return new MediaRecorder(stream);
   }
 }
 

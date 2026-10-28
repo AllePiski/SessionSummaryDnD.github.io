@@ -37,6 +37,9 @@
   --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
   --color-rec: var(--rec);
+  --color-rec-bright: var(--rec-bright);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
@@ -63,7 +66,11 @@
   --accent: oklch(0.92 0.03 80);
   --accent-foreground: oklch(0.26 0.03 60);
   --destructive: oklch(0.55 0.2 27);
+  /* rosso REC: pieno per i pulsanti (testo bianco ≥ 4.5:1), "bright" per pallini e scritte */
   --rec: oklch(0.57 0.21 27);
+  --rec-bright: oklch(0.57 0.21 27);
+  --success: #0b8a0b;
+  --warning: #c98500;
   --border: oklch(0.32 0.03 60 / 13%);
   --input: oklch(0.32 0.03 60 / 18%);
   --ring: oklch(0.6 0.12 70 / 55%);
@@ -107,7 +114,10 @@
   --accent: oklch(0.275 0.018 65);
   --accent-foreground: oklch(0.95 0.018 85);
   --destructive: oklch(0.66 0.19 25);
-  --rec: oklch(0.64 0.21 25);
+  --rec: oklch(0.56 0.2 25);
+  --rec-bright: oklch(0.68 0.2 25);
+  --success: #0ca30c;
+  --warning: #fab219;
   --border: oklch(1 0 0 / 9%);
   --input: oklch(1 0 0 / 14%);
   --ring: oklch(0.8 0.12 80 / 50%);

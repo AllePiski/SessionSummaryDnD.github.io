@@ -60,6 +60,7 @@ export function DieFace({
   color,
   icon = false,
   className,
+  textRef,
 }: {
   sides: number;
   value: number | null;
@@ -67,6 +68,8 @@ export function DieFace({
   /** solo la forma, senza numero (per icone e pulsanti) */
   icon?: boolean;
   className?: string;
+  /** accesso diretto al numero, per farlo scorrere durante il lancio senza render */
+  textRef?: React.Ref<SVGTextElement>;
 }) {
   const id = `die${useId().replace(/[^a-zA-Z0-9]/g, "")}`;
   const shape = shapeFor(sides);
@@ -97,6 +100,7 @@ export function DieFace({
       <path d={shape.facets} fill="none" stroke="white" strokeOpacity={0.28} strokeWidth={2} strokeLinejoin="round" />
       {!icon && (
         <text
+          ref={textRef}
           x={50}
           y={shape.text.y}
           textAnchor="middle"
@@ -148,7 +152,7 @@ export function RollingDie({
   className?: string;
 }) {
   const ref = useRef<HTMLDivElement>(null);
-  const [shown, setShown] = useState(() => (animate ? rollDie(sides) : value));
+  const textRef = useRef<SVGTextElement>(null);
   const [settled, setSettled] = useState(!animate);
 
   useEffect(() => {
@@ -167,10 +171,14 @@ export function RollingDie({
       ],
       { duration, delay, easing: "cubic-bezier(.25,.75,.35,1)", fill: "backwards" },
     );
-    const flicker = setInterval(() => setShown(rollDie(sides)), 75);
+    // i numeri che scorrono si scrivono direttamente nel DOM: un solo render a fine lancio
+    const show = (n: number) => {
+      if (textRef.current) textRef.current.textContent = String(n);
+    };
+    const flicker = setInterval(() => show(rollDie(sides)), 75);
     const stop = setTimeout(() => {
       clearInterval(flicker);
-      setShown(value);
+      show(value);
       setSettled(true);
     }, delay + duration * 0.82);
     return () => {
@@ -191,7 +199,7 @@ export function RollingDie({
         className,
       )}
     >
-      <DieFace sides={sides} value={shown} color={color} className="size-full" />
+      <DieFace sides={sides} value={value} color={color} textRef={textRef} className="size-full" />
     </div>
   );
 }

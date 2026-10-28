@@ -24,16 +24,13 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
+import { SpeechLanguageSelect } from "@/components/speech-language-select";
 import { SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
 import { Switch } from "@/components/ui/switch";
-import { useRecording, useTranscription } from "@/hooks/use-data";
+import { useRecordingStatus, useTranscription } from "@/hooks/use-data";
 import { db } from "@/lib/db";
 import { formatBytes } from "@/lib/format";
-import { setSetting } from "@/lib/repo";
-import { SETTING_LANG } from "@/lib/settings";
-import { SPEECH_LANGUAGES } from "@/lib/transcriber";
 
 interface StorageInfo {
   usage: number;
@@ -52,7 +49,7 @@ export function SettingsDialog() {
   const [open, setOpen] = useState(false);
   const [storage, setStorage] = useState<StorageInfo | null>(null);
   const speech = useTranscription();
-  const { state } = useRecording();
+  const status = useRecordingStatus();
 
   useEffect(() => {
     if (!open) return;
@@ -122,18 +119,7 @@ export function SettingsDialog() {
               </div>
               <div className="flex items-center justify-between gap-4">
                 <Label htmlFor="lang">Lingua parlata al tavolo</Label>
-                <Select value={speech.lang} onValueChange={(v) => void setSetting(SETTING_LANG, v)}>
-                  <SelectTrigger id="lang" className="w-44">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {SPEECH_LANGUAGES.map((l) => (
-                      <SelectItem key={l.value} value={l.value}>
-                        {l.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <SpeechLanguageSelect id="lang" />
               </div>
             </section>
 
@@ -151,7 +137,7 @@ export function SettingsDialog() {
                   </p>
                   {storage.persisted ? (
                     <p className="flex items-center gap-2 text-sm">
-                      <CheckCircle2 className="size-4 text-[#0ca30c]" /> Archivio protetto dalla pulizia automatica
+                      <CheckCircle2 className="size-4 text-success" /> Archivio protetto dalla pulizia automatica
                     </p>
                   ) : (
                     <Button variant="outline" size="sm" className="w-fit" onClick={() => void persist()}>
@@ -177,7 +163,7 @@ export function SettingsDialog() {
               </div>
               <AlertDialog>
                 <AlertDialogTrigger asChild>
-                  <Button variant="destructive" size="sm" disabled={state.status !== "idle"}>
+                  <Button variant="destructive" size="sm" disabled={status !== "idle"}>
                     <Trash2 /> Elimina
                   </Button>
                 </AlertDialogTrigger>

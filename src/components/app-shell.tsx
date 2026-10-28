@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
 import { toast } from "sonner";
 import { Archive, AudioLines, Dices, LayoutDashboard, Mic, Moon, Sun, Users } from "lucide-react";
@@ -30,7 +30,9 @@ import { Switch } from "@/components/ui/switch";
 import { CharacterAvatar } from "@/components/avatars/character-avatar";
 import { ElapsedTime } from "@/components/record/elapsed-time";
 import { SettingsDialog } from "@/components/settings-dialog";
-import { useCharacters, useRecording, useTranscription } from "@/hooks/use-data";
+import { useCharacters, useRecordingState, useRecordingStatus, useTranscription } from "@/hooks/use-data";
+import { formatClock } from "@/lib/format";
+import { getRecordingEngine } from "@/lib/recording-engine";
 import { recoverInterruptedSessions } from "@/lib/repo";
 
 const NAV = [
@@ -72,6 +74,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <div className="flex-1 px-4 py-6 md:px-8 md:py-8">{children}</div>
       </SidebarInset>
       <RecoveryWatcher />
+      <StopNotifier />
+      <RecordingTabTitle />
     </SidebarProvider>
   );
 }
@@ -181,13 +185,13 @@ function SpeechToggle() {
 }
 
 function RecIndicator({ pathname }: { pathname: string }) {
-  const { state } = useRecording();
-  if (state.status === "idle" || pathname === "/record") return null;
+  const status = useRecordingStatus();
+  if (status === "idle" || pathname === "/record") return null;
   return (
-    <Button asChild variant="outline" size="sm" className="gap-2 border-rec/40 text-rec">
+    <Button asChild variant="outline" size="sm" className="gap-2 border-rec-bright/40 text-rec-bright">
       <Link href="/record">
-        <span className={`size-2 rounded-full bg-rec ${state.status === "recording" ? "rec-dot" : ""}`} />
-        {state.status === "paused" ? "In pausa" : "REC"}
+        <span className={`size-2 rounded-full bg-rec-bright ${status === "recording" ? "rec-dot" : ""}`} />
+        {status === "paused" ? "In pausa" : "REC"}
         <ElapsedTime className="font-medium text-foreground" />
       </Link>
     </Button>
@@ -213,12 +217,11 @@ function ThemeToggle() {
 
 /** All'avvio ricostruisce le sessioni rimaste a metà (tab chiusa o crash). */
 function RecoveryWatcher() {
-  const { engine } = useRecording();
   const done = useRef(false);
   useEffect(() => {
     if (done.current) return;
     done.current = true;
-    recoverInterruptedSessions(engine.getSnapshot().sessionId)
+    recoverInterruptedSessions(getRecordingEngine().getSnapshot().sessionId)
       .then((sessions) =>
         sessions.forEach((s) =>
           toast.info(`Recuperata la sessione “${s.title}”`, {
@@ -227,7 +230,48 @@ function RecoveryWatcher() {
         ),
       )
       .catch(() => {});
-  }, [engine]);
+  }, []);
+  return null;
+}
+
+/** Avvisa quando una registrazione si chiude da sola (es. microfono scollegato). */
+function StopNotifier() {
+  const router = useRouter();
+  const lastStop = useRecordingState((s) => s.lastStop);
+  useEffect(() => {
+    if (!lastStop) return;
+    if (lastStop.reason === "mic-ended") {
+      const { sessionId, durationMs } = lastStop;
+      toast.warning("Il microfono si è scollegato", {
+        description: `La registrazione è stata salvata fino a ${formatClock(durationMs)}.`,
+        duration: Infinity,
+        action: { label: "Apri sessione", onClick: () => router.push(`/session/?id=${sessionId}`) },
+      });
+    }
+    getRecordingEngine().clearLastStop();
+  }, [lastStop, router]);
+  return null;
+}
+
+const TAB_PREFIX = /^(● REC [\d:]+|⏸ In pausa) · /;
+
+/** Durante la registrazione il titolo della scheda mostra "● REC 1:02:33" o "⏸ In pausa". */
+function RecordingTabTitle() {
+  const status = useRecordingStatus();
+  useEffect(() => {
+    if (status !== "recording" && status !== "paused") return;
+    const update = () => {
+      const base = document.title.replace(TAB_PREFIX, "");
+      const prefix = status === "paused" ? "⏸ In pausa" : `● REC ${formatClock(getRecordingEngine().elapsed())}`;
+      document.title = `${prefix} · ${base}`;
+    };
+    update();
+    const id = setInterval(update, 1000);
+    return () => {
+      clearInterval(id);
+      document.title = document.title.replace(TAB_PREFIX, "");
+    };
+  }, [status]);
   return null;
 }
 

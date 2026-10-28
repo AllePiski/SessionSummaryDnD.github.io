@@ -46,3 +46,17 @@ export const CLASSES = [
   "Stregone",
   "Warlock",
 ] as const;
+
+/**
+ * Primo avatar (razza + genere) non ancora usato da nessuno dei presenti:
+ * così due comparse non sembrano gemelle.
+ */
+export function pickUnusedAvatar(used: { raceId: string; gender: Gender }[]): { raceId: string; gender: Gender } {
+  const taken = new Set(used.map((u) => `${u.raceId}:${u.gender}`));
+  for (const race of RACES) {
+    for (const gender of ["m", "f"] as const) {
+      if (!taken.has(`${race.id}:${gender}`)) return { raceId: race.id, gender };
+    }
+  }
+  return { raceId: "umano", gender: "m" };
+}

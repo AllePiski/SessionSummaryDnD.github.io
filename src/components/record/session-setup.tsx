@@ -8,28 +8,27 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { CharacterAvatar } from "@/components/avatars/character-avatar";
 import { CharacterDialog } from "@/components/characters/character-dialog";
 import { DatePicker } from "@/components/date-picker";
 import { PageHeader, PageLoading } from "@/components/page-header";
-import { SETTING_DEVICE, SETTING_LANG } from "@/lib/settings";
+import { SpeechLanguageSelect } from "@/components/speech-language-select";
+import { SETTING_DEVICE } from "@/lib/settings";
 import { MicCheck } from "./mic-check";
 import { useClientValue } from "@/hooks/use-client-value";
-import { useCharacters, useRecording, useSetting, useTranscription } from "@/hooks/use-data";
+import { useCharacters, useSetting, useTranscription } from "@/hooks/use-data";
 import { audioFileName, isRecordingSupported, pickMimeType } from "@/lib/audio";
 import { characterSubtitle, splitByKind } from "@/lib/characters";
 import { defaultSessionTitle, todayISO } from "@/lib/format";
+import { getRecordingEngine } from "@/lib/recording-engine";
 import { createSession, deleteSession, requestPersistentStorage, setSetting } from "@/lib/repo";
-import { SPEECH_LANGUAGES } from "@/lib/transcriber";
 import type { Character } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 
 export function SessionSetup() {
   const characters = useCharacters();
-  const { engine } = useRecording();
   const support = {
     recording: useClientValue(isRecordingSupported, true),
     mime: useClientValue(pickMimeType, "audio/webm"),
@@ -89,8 +88,10 @@ export function SessionSetup() {
       transcription: canTranscribe ? "live" : "none",
     });
     try {
-      await engine.start({
+      await getRecordingEngine().start({
         sessionId: session.id,
+        title: sessionTitle,
+        date,
         participantIds,
         initialSpeakerIds: [master.id],
         language: lang,
@@ -237,18 +238,7 @@ export function SessionSetup() {
                       <Label htmlFor="setup-lang" className="font-normal">
                         Lingua
                       </Label>
-                      <Select value={lang} onValueChange={(v) => void setSetting(SETTING_LANG, v)}>
-                        <SelectTrigger id="setup-lang" className="w-40">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {SPEECH_LANGUAGES.map((l) => (
-                            <SelectItem key={l.value} value={l.value}>
-                              {l.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <SpeechLanguageSelect id="setup-lang" className="w-40" />
                     </div>
                   )}
                 </>

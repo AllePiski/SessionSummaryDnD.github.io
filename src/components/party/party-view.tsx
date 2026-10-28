@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useLiveQuery } from "dexie-react-hooks";
 import { toast } from "sonner";
 import { Crown, Pencil, Plus, Trash2, UserRoundPlus } from "lucide-react";
 import {
@@ -20,16 +21,18 @@ import { CharacterAvatar } from "@/components/avatars/character-avatar";
 import { CharacterDialog } from "@/components/characters/character-dialog";
 import { PageHeader, PageLoading } from "@/components/page-header";
 import { PartyWizard } from "./party-wizard";
-import { useCharacters, useRecording, useSessions } from "@/hooks/use-data";
+import { useCharacters, useRecordingStatus } from "@/hooks/use-data";
 import { characterSubtitle, splitByKind } from "@/lib/characters";
+import { db } from "@/lib/db";
 import { deleteParty, removeCharacter } from "@/lib/repo";
 import type { Character } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 export function PartyView() {
   const characters = useCharacters();
-  const sessions = useSessions();
-  const { state } = useRecording();
+  const status = useRecordingStatus();
+  // basta il numero di sessioni: niente caricamento di tutte le sessioni
+  const sessionCount = useLiveQuery(() => db.sessions.count(), []);
   const [confirmParty, setConfirmParty] = useState(false);
   const [editing, setEditing] = useState<Character | null>(null);
   const [creating, setCreating] = useState<"pc" | "npc" | null>(null);
@@ -41,7 +44,7 @@ export function PartyView() {
 
   if (pcs.length === 0) return <PartyWizard existingMaster={master} />;
 
-  const recording = state.status !== "idle";
+  const recording = status !== "idle";
 
   async function confirmDelete() {
     if (!deleting) return;
@@ -130,7 +133,7 @@ export function PartyView() {
         onOpenChange={setConfirmParty}
         pcCount={pcs.length}
         npcCount={npcs.length}
-        sessionCount={sessions?.length ?? 0}
+        sessionCount={sessionCount ?? 0}
       />
     </div>
   );

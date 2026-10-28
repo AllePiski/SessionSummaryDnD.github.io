@@ -32,7 +32,7 @@ export function pickMimeType(): string {
   return MIME_CANDIDATES.find((t) => MediaRecorder.isTypeSupported(t)) ?? "";
 }
 
-export function extensionFor(mime: string): string {
+function extensionFor(mime: string): string {
   if (mime.includes("mp4") || mime.includes("aac")) return "m4a";
   if (mime.includes("ogg")) return "ogg";
   return "webm";

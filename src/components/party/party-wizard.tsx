@@ -156,7 +156,7 @@ export function PartyWizard({ existingMaster }: { existingMaster?: Character }) 
             <CardContent>
               <CharacterFields
                 value={member}
-                onChange={(next) => setMembers((prev) => prev.map((m, j) => (j === i ? next : m)))}
+                onChange={(update) => setMembers((prev) => prev.map((m, j) => (j === i ? update(m) : m)))}
                 namePlaceholder={`Personaggio ${i + 1}`}
                 showPlayer
                 showClass

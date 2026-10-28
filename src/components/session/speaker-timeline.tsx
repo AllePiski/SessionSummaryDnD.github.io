@@ -3,6 +3,7 @@
 import { useMemo, useRef, useState } from "react";
 import { CharacterAvatar } from "@/components/avatars/character-avatar";
 import { usePlayerActions, usePlayerState } from "./player";
+import { compareCharacters } from "@/lib/characters";
 import { characterColor } from "@/lib/colors";
 import { formatClock } from "@/lib/format";
 import type { Character, Session } from "@/lib/types";
@@ -50,10 +51,7 @@ export function SpeakerTimeline({
         lane.segments.push({ start: turn.start, end: turn.end, group: turn.speakerIds.length });
       }
     });
-    const order = { master: 0, pc: 1, npc: 2 } as const;
-    return [...byId.values()].sort(
-      (a, b) => order[a.character.kind] - order[b.character.kind] || a.character.order - b.character.order,
-    );
+    return [...byId.values()].sort((a, b) => compareCharacters(a.character, b.character));
   }, [session.turns, characters]);
 
   const ticks = useMemo(() => {

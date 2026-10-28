@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useRef } from "react";
+import { memo, useMemo } from "react";
 import { MessageSquareText } from "lucide-react";
 import { CharacterAvatar } from "@/components/avatars/character-avatar";
+import { useStickToBottom } from "@/hooks/use-stick-to-bottom";
 import { characterColor } from "@/lib/colors";
 import { formatClock, formatDuration, sameSpeakers } from "@/lib/format";
 import { speakerNames } from "@/lib/screenplay";
@@ -15,7 +16,7 @@ interface Group {
   key: string;
   speakerIds: string[];
   t: number;
-  texts: string[];
+  lines: TranscriptLine[];
 }
 
 /** Trascrizione in diretta, raggruppata per personaggio. */
@@ -28,58 +29,34 @@ export function LiveTranscript({
   interim: { text: string; speakerIds: string[] } | null;
   characters: Map<string, Character>;
 }) {
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const stickRef = useRef(true);
-
   const groups = useMemo(() => {
     const out: Group[] = [];
     for (const line of lines.slice(-MAX_VISIBLE)) {
       const last = out.at(-1);
-      if (last && sameSpeakers(last.speakerIds, line.speakerIds)) last.texts.push(line.text);
-      else out.push({ key: line.id, speakerIds: line.speakerIds, t: line.t, texts: [line.text] });
+      if (last && sameSpeakers(last.speakerIds, line.speakerIds)) last.lines.push(line);
+      else out.push({ key: line.id, speakerIds: line.speakerIds, t: line.t, lines: [line] });
     }
     return out;
   }, [lines]);
 
-  useEffect(() => {
-    const el = scrollRef.current;
-    if (el && stickRef.current) el.scrollTop = el.scrollHeight;
-  }, [groups, interim]);
-
-  const interimJoins = interim && groups.length > 0 && sameSpeakers(groups.at(-1)!.speakerIds, interim.speakerIds);
+  const last = groups.at(-1);
+  const interimJoins = !!interim && !!last && sameSpeakers(last.speakerIds, interim.speakerIds);
+  const { ref, onScroll } = useStickToBottom<HTMLDivElement>(`${lines.length}:${interim?.text ?? ""}`);
 
   return (
-    <div
-      ref={scrollRef}
-      onScroll={(e) => {
-        const el = e.currentTarget;
-        stickRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 60;
-      }}
-      className="h-full overflow-y-auto px-4 py-3"
-      aria-live="polite"
-    >
-      {groups.length === 0 && !interim && (
-        <div className="grid h-full place-items-center py-10 text-center text-sm text-muted-foreground">
-          <div className="grid justify-items-center gap-2">
-            <MessageSquareText className="size-8 opacity-50" />
-            <p>Le battute compariranno qui mentre parlate.</p>
-          </div>
-        </div>
-      )}
-      <ol className="grid gap-4">
+    <div ref={ref} onScroll={onScroll} className="h-full overflow-y-auto px-4 py-3">
+      {groups.length === 0 && !interim && <EmptyState>Le battute compariranno qui mentre parlate.</EmptyState>}
+      <ol role="log" aria-label="Trascrizione dal vivo" className="grid gap-4">
         {groups.map((g, i) => (
-          <li key={g.key}>
-            <GroupHeader ids={g.speakerIds} t={g.t} characters={characters} />
-            <p className="mt-1 pl-9 text-sm leading-relaxed">
-              {g.texts.join(" ")}
-              {interimJoins && i === groups.length - 1 && (
-                <span className="text-muted-foreground italic"> {interim!.text}…</span>
-              )}
-            </p>
-          </li>
+          <TranscriptGroup
+            key={g.key}
+            group={g}
+            characters={characters}
+            interimText={interimJoins && i === groups.length - 1 ? interim.text : undefined}
+          />
         ))}
         {interim && !interimJoins && (
-          <li>
+          <li aria-hidden>
             <GroupHeader ids={interim.speakerIds} characters={characters} />
             <p className="mt-1 pl-9 text-sm text-muted-foreground italic">{interim.text}…</p>
           </li>
@@ -88,6 +65,33 @@ export function LiveTranscript({
     </div>
   );
 }
+
+/** Un gruppo di battute dello stesso personaggio: solo l'ultimo riceve il testo provvisorio. */
+const TranscriptGroup = memo(function TranscriptGroup({
+  group,
+  characters,
+  interimText,
+}: {
+  group: Group;
+  characters: Map<string, Character>;
+  interimText?: string;
+}) {
+  return (
+    <li>
+      <GroupHeader ids={group.speakerIds} t={group.t} characters={characters} />
+      <p className="mt-1 pl-9 text-sm leading-relaxed">
+        {group.lines.map((l) => (
+          <span key={l.id}>{l.text} </span>
+        ))}
+        {interimText && (
+          <span aria-hidden className="text-muted-foreground italic">
+            {interimText}…
+          </span>
+        )}
+      </p>
+    </li>
+  );
+});
 
 /** Registro dei turni di parola (quando il riconoscimento vocale è spento). */
 export function TurnLog({
@@ -99,35 +103,17 @@ export function TurnLog({
   currentTurn: { speakerIds: string[]; start: number } | null;
   characters: Map<string, Character>;
 }) {
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const stickRef = useRef(true);
   const visible = turns.filter((t) => t.end - t.start >= 1000).slice(-MAX_VISIBLE);
-
-  useEffect(() => {
-    const el = scrollRef.current;
-    if (el && stickRef.current) el.scrollTop = el.scrollHeight;
-  }, [visible.length, currentTurn]);
+  const { ref, onScroll } = useStickToBottom<HTMLDivElement>(`${visible.length}:${currentTurn?.start}`);
 
   return (
-    <div
-      ref={scrollRef}
-      onScroll={(e) => {
-        const el = e.currentTarget;
-        stickRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 60;
-      }}
-      className="h-full overflow-y-auto px-4 py-3"
-    >
+    <div ref={ref} onScroll={onScroll} className="h-full overflow-y-auto px-4 py-3">
       {visible.length === 0 && !currentTurn && (
-        <div className="grid h-full place-items-center py-10 text-center text-sm text-muted-foreground">
-          <div className="grid justify-items-center gap-2">
-            <MessageSquareText className="size-8 opacity-50" />
-            <p>
-              Tocca chi sta parlando: qui compare
-              <br />
-              la sequenza dei turni di parola.
-            </p>
-          </div>
-        </div>
+        <EmptyState>
+          Tocca chi sta parlando: qui compare
+          <br />
+          la sequenza dei turni di parola.
+        </EmptyState>
       )}
       <ol className="grid gap-3">
         {visible.map((turn) => (
@@ -148,6 +134,17 @@ export function TurnLog({
           </li>
         )}
       </ol>
+    </div>
+  );
+}
+
+function EmptyState({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="grid h-full place-items-center py-10 text-center text-sm text-muted-foreground">
+      <div className="grid justify-items-center gap-2">
+        <MessageSquareText className="size-8 opacity-50" />
+        <p>{children}</p>
+      </div>
     </div>
   );
 }

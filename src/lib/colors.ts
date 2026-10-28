@@ -6,7 +6,7 @@ import type { Character } from "./types";
  * L'ordine degli slot è stato validato per la distinguibilità anche con
  * daltonismo; il colore non è mai l'unico segnale (c'è sempre nome/avatar).
  */
-export const PC_COLOR_SLOTS = 7;
+const PC_COLOR_SLOTS = 7;
 
 export function characterColor(c: Pick<Character, "kind" | "colorSlot"> | undefined): string {
   if (!c) return "var(--char-neutral)";

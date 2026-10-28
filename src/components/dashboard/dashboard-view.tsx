@@ -8,13 +8,13 @@ import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle }
 import { CharacterAvatar } from "@/components/avatars/character-avatar";
 import { D20Logo } from "@/components/app-shell";
 import { PageLoading } from "@/components/page-header";
+import { StatTile } from "@/components/stat-tile";
 import { ElapsedTime } from "@/components/record/elapsed-time";
 import { SessionRow } from "@/components/sessions/sessions-view";
 import { TalkTime } from "@/components/session/talk-time";
 import { useCharacterMap, useCharacters, useRecording, useSessions } from "@/hooks/use-data";
-import { characterColor } from "@/lib/colors";
+import { characterSubtitle, splitByKind } from "@/lib/characters";
 import { formatDuration, formatShortDate } from "@/lib/format";
-import { raceLabel } from "@/lib/races";
 import { speakerStats, type SpeakerStat } from "@/lib/screenplay";
 
 export function DashboardView() {
@@ -58,8 +58,7 @@ export function DashboardView() {
 
   if (characters === undefined || sessions === undefined) return <PageLoading />;
 
-  const party = characters.filter((c) => c.kind === "pc");
-  const master = characters.find((c) => c.kind === "master");
+  const { master, pcs: party } = splitByKind(characters);
   if (party.length === 0) return <Welcome />;
 
   const recording = state.status !== "idle";
@@ -87,17 +86,9 @@ export function DashboardView() {
             <div className="flex flex-wrap gap-4">
               {[...(master ? [master] : []), ...party].map((c) => (
                 <div key={c.id} className="grid w-20 justify-items-center gap-1 text-center">
-                  <span className="relative">
-                    <CharacterAvatar character={c} className="size-14" />
-                    <span
-                      className="absolute right-0 bottom-0 size-3 rounded-full ring-2 ring-card"
-                      style={{ background: characterColor(c) }}
-                    />
-                  </span>
+                  <CharacterAvatar character={c} showColor className="size-14" />
                   <span className="w-full truncate text-xs font-medium">{c.name}</span>
-                  <span className="-mt-1 w-full truncate text-[10px] text-muted-foreground">
-                    {c.kind === "master" ? "Master" : raceLabel(c.raceId, c.gender)}
-                  </span>
+                  <span className="-mt-1 w-full truncate text-[10px] text-muted-foreground">{characterSubtitle(c)}</span>
                 </div>
               ))}
             </div>
@@ -131,10 +122,10 @@ export function DashboardView() {
       </Card>
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Tile label="Sessioni registrate" value={String(totals.count)} />
-        <Tile label="Tempo di gioco registrato" value={totals.durationMs ? formatDuration(totals.durationMs) : "—"} />
-        <Tile label="Turni di parola" value={totals.turns.toLocaleString("it-IT")} />
-        <Tile
+        <StatTile label="Sessioni registrate" value={String(totals.count)} />
+        <StatTile label="Tempo di gioco registrato" value={totals.durationMs ? formatDuration(totals.durationMs) : "—"} />
+        <StatTile label="Turni di parola" value={totals.turns.toLocaleString("it-IT")} />
+        <StatTile
           label="Ultima sessione"
           value={totals.last ? formatShortDate(totals.last.date) : "—"}
           detail={totals.last?.title}
@@ -184,16 +175,6 @@ export function DashboardView() {
         </Card>
       </div>
     </div>
-  );
-}
-
-function Tile({ label, value, detail }: { label: string; value: string; detail?: string }) {
-  return (
-    <Card size="sm" className="gap-1 px-4">
-      <p className="text-sm text-muted-foreground">{label}</p>
-      <p className="text-2xl font-semibold tracking-tight">{value}</p>
-      {detail && <p className="truncate text-xs text-muted-foreground">{detail}</p>}
-    </Card>
   );
 }
 

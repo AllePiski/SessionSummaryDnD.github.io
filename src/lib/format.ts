@@ -66,6 +66,11 @@ export function formatBytes(bytes: number): string {
   return `${(bytes / 1024 ** 3).toFixed(2)} GB`;
 }
 
+/** plural(1, "battuta", "battute") → "1 battuta"; plural(3, …) → "3 battute" */
+export function plural(n: number, one: string, many: string): string {
+  return `${n.toLocaleString("it-IT")} ${n === 1 ? one : many}`;
+}
+
 export function countWords(text: string): number {
   const trimmed = text.trim();
   return trimmed ? trimmed.split(/\s+/).length : 0;

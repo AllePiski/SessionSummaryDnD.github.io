@@ -32,7 +32,6 @@ import { ElapsedTime } from "@/components/record/elapsed-time";
 import { SettingsDialog } from "@/components/settings-dialog";
 import { useCharacters, useRecording, useTranscription } from "@/hooks/use-data";
 import { recoverInterruptedSessions } from "@/lib/repo";
-import { characterColor } from "@/lib/colors";
 
 const NAV = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
@@ -125,13 +124,7 @@ function AppSidebar({ pathname }: { pathname: string }) {
               <ul className="grid gap-1 px-2">
                 {party.map((c) => (
                   <li key={c.id} className="flex items-center gap-2 text-sm">
-                    <span className="relative">
-                      <CharacterAvatar character={c} className="size-6" />
-                      <span
-                        className="absolute -right-0.5 -bottom-0.5 size-2 rounded-full ring-2 ring-sidebar"
-                        style={{ background: characterColor(c) }}
-                      />
-                    </span>
+                    <CharacterAvatar character={c} showColor ringClassName="ring-sidebar" className="size-6" />
                     <span className="truncate">{c.name}</span>
                   </li>
                 ))}

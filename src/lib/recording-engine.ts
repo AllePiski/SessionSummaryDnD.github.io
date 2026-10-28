@@ -5,7 +5,7 @@ import { sameSpeakers, uid } from "./format";
 import { LiveTranscriber, isSpeechRecognitionSupported, type SpeechStatus } from "./transcriber";
 import type { TranscriptLine, Turn } from "./types";
 
-export type EngineStatus = "idle" | "starting" | "recording" | "paused" | "stopping";
+type EngineStatus = "idle" | "starting" | "recording" | "paused" | "stopping";
 
 export interface EngineState {
   status: EngineStatus;
@@ -23,7 +23,7 @@ export interface EngineState {
   mimeType: string;
 }
 
-export interface StartOptions {
+interface StartOptions {
   sessionId: string;
   participantIds: string[];
   initialSpeakerIds: string[];

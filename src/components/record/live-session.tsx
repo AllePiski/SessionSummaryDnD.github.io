@@ -25,12 +25,11 @@ import { LevelMeter } from "./level-meter";
 import { LiveTranscript, TurnLog } from "./live-transcript";
 import { AddSpeakerTile, SpeakerTile } from "./speaker-tile";
 import { useCharacterMap, useRecording, useSession } from "@/hooks/use-data";
+import { kindRank } from "@/lib/characters";
 import { formatLongDate } from "@/lib/format";
 import { speakerNames } from "@/lib/screenplay";
 import type { Character } from "@/lib/types";
 import { cn } from "@/lib/utils";
-
-const KIND_ORDER = { master: 0, pc: 1, npc: 2 } as const;
 
 function shortcutFor(index: number): string | undefined {
   return index < 10 ? String((index + 1) % 10) : undefined;
@@ -58,7 +57,7 @@ export function LiveSession() {
       .map((c, arrival) => ({ c, arrival }))
       .sort(
         (a, b) =>
-          KIND_ORDER[a.c.kind] - KIND_ORDER[b.c.kind] ||
+          kindRank(a.c) - kindRank(b.c) ||
           (a.c.kind === "pc" ? a.c.order - b.c.order : a.arrival - b.arrival),
       )
       .map((x) => x.c);

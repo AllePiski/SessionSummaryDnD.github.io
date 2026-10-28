@@ -12,8 +12,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { CharacterFields } from "./character-fields";
+import { CharacterKindToggle, type NewCharacterKind } from "./character-kind-toggle";
 import { addCharacter, updateCharacter, type CharacterDraft } from "@/lib/repo";
 import type { Character, CharacterKind } from "@/lib/types";
 
@@ -40,18 +40,12 @@ export function CharacterDialog({
   character,
   defaultKind = "pc",
   onSaved,
-  title,
-  description,
-  submitLabel,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   character?: Character;
-  defaultKind?: Exclude<CharacterKind, "master">;
+  defaultKind?: NewCharacterKind;
   onSaved?: (character: Character) => void;
-  title?: string;
-  description?: string;
-  submitLabel?: string;
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -60,9 +54,6 @@ export function CharacterDialog({
           <CharacterDialogBody
             character={character}
             defaultKind={defaultKind}
-            title={title}
-            description={description}
-            submitLabel={submitLabel}
             onDone={(saved) => {
               onOpenChange(false);
               if (saved) onSaved?.(saved);
@@ -77,16 +68,10 @@ export function CharacterDialog({
 function CharacterDialogBody({
   character,
   defaultKind,
-  title,
-  description,
-  submitLabel,
   onDone,
 }: {
   character?: Character;
-  defaultKind: Exclude<CharacterKind, "master">;
-  title?: string;
-  description?: string;
-  submitLabel?: string;
+  defaultKind: NewCharacterKind;
   onDone: (saved: Character | null) => void;
 }) {
   const [draft, setDraft] = useState<CharacterDraft>(character ? toDraft(character) : EMPTY_DRAFT);
@@ -118,28 +103,18 @@ function CharacterDialogBody({
   return (
     <form onSubmit={submit} className="grid gap-5">
       <DialogHeader>
-        <DialogTitle>{title ?? (character ? `Modifica ${character.name}` : "Nuovo personaggio")}</DialogTitle>
+        <DialogTitle>{character ? `Modifica ${character.name}` : "Nuovo personaggio"}</DialogTitle>
         <DialogDescription>
-          {description ??
-            (isMaster
-              ? "Il nome e l'immagine con cui il master compare nelle sessioni."
-              : "Scegli un avatar per razza oppure carica una foto.")}
+          {isMaster
+            ? "Il nome e l'immagine con cui il master compare nelle sessioni."
+            : "Scegli un avatar per razza oppure carica una foto."}
         </DialogDescription>
       </DialogHeader>
 
       {!isMaster && (
         <div className="grid gap-1.5">
           <Label>Tipo</Label>
-          <ToggleGroup
-            type="single"
-            variant="outline"
-            value={kind}
-            onValueChange={(v) => v && setKind(v as CharacterKind)}
-            className="w-fit"
-          >
-            <ToggleGroupItem value="pc">Personaggio del party</ToggleGroupItem>
-            <ToggleGroupItem value="npc">PNG / comparsa</ToggleGroupItem>
-          </ToggleGroup>
+          <CharacterKindToggle value={kind as NewCharacterKind} onChange={setKind} />
         </div>
       )}
 
@@ -158,7 +133,7 @@ function CharacterDialogBody({
           Annulla
         </Button>
         <Button type="submit" disabled={saving}>
-          {submitLabel ?? (character ? "Salva modifiche" : "Aggiungi")}
+          {character ? "Salva modifiche" : "Aggiungi"}
         </Button>
       </DialogFooter>
     </form>

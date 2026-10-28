@@ -23,8 +23,6 @@ export const RACES = [
   { id: "forgiato", m: "Forgiato", f: "Forgiata" },
 ] as const;
 
-export type RaceId = (typeof RACES)[number]["id"];
-
 export const MASTER_AVATAR = "master";
 
 export function raceLabel(raceId: string, gender: Gender): string {

@@ -7,6 +7,7 @@ import { getRecordingEngine, IDLE_ENGINE_STATE } from "@/lib/recording-engine";
 import { setSetting } from "@/lib/repo";
 import { DEFAULT_LANG, DEFAULT_TRANSCRIBE, SETTING_LANG, SETTING_TRANSCRIBE } from "@/lib/settings";
 import { isSpeechRecognitionSupported } from "@/lib/transcriber";
+import { useClientValue } from "./use-client-value";
 import type { Character } from "@/lib/types";
 
 /** Personaggi attivi ordinati (undefined mentre carica). */
@@ -50,8 +51,6 @@ export function useRecording() {
   return { state, engine };
 }
 
-const noopSubscribe = () => () => {};
-
 /**
  * Opzione "riconoscimento vocale": salvata nelle impostazioni e applicata
  * subito anche alla registrazione in corso.
@@ -59,7 +58,7 @@ const noopSubscribe = () => () => {};
 export function useTranscription() {
   const enabled = useSetting(SETTING_TRANSCRIBE, DEFAULT_TRANSCRIBE);
   const lang = useSetting(SETTING_LANG, DEFAULT_LANG);
-  const supported = useSyncExternalStore(noopSubscribe, isSpeechRecognitionSupported, () => true);
+  const supported = useClientValue(isSpeechRecognitionSupported, true);
   const setEnabled = useCallback(
     (value: boolean) => {
       void setSetting(SETTING_TRANSCRIBE, value);

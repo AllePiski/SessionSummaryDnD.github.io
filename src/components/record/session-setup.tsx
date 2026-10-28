@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useSyncExternalStore } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { Check, Crown, FileAudio, Plus, TriangleAlert, Users } from "lucide-react";
@@ -16,29 +16,24 @@ import { DatePicker } from "@/components/date-picker";
 import { PageHeader, PageLoading } from "@/components/page-header";
 import { SETTING_DEVICE, SETTING_LANG } from "@/lib/settings";
 import { MicCheck } from "./mic-check";
+import { useClientValue } from "@/hooks/use-client-value";
 import { useCharacters, useRecording, useSetting, useTranscription } from "@/hooks/use-data";
 import { audioFileName, isRecordingSupported, pickMimeType } from "@/lib/audio";
-import { characterColor } from "@/lib/colors";
+import { characterSubtitle, splitByKind } from "@/lib/characters";
 import { defaultSessionTitle, todayISO } from "@/lib/format";
-import { raceLabel } from "@/lib/races";
 import { createSession, deleteSession, requestPersistentStorage, setSetting } from "@/lib/repo";
 import { SPEECH_LANGUAGES } from "@/lib/transcriber";
 import type { Character } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
-const noopSubscribe = () => () => {};
-
-/** Capacità del browser (lette solo sul client, durante il prerender valgono true). */
-function useBrowserSupport() {
-  const recording = useSyncExternalStore(noopSubscribe, isRecordingSupported, () => true);
-  const mime = useSyncExternalStore(noopSubscribe, pickMimeType, () => "audio/webm");
-  return { recording, mime };
-}
 
 export function SessionSetup() {
   const characters = useCharacters();
   const { engine } = useRecording();
-  const support = useBrowserSupport();
+  const support = {
+    recording: useClientValue(isRecordingSupported, true),
+    mime: useClientValue(pickMimeType, "audio/webm"),
+  };
   const speech = useTranscription();
   const savedDevice = useSetting(SETTING_DEVICE, "");
 
@@ -52,9 +47,7 @@ export function SessionSetup() {
 
   if (characters === undefined) return <PageLoading />;
 
-  const master = characters.find((c) => c.kind === "master");
-  const pcs = characters.filter((c) => c.kind === "pc");
-  const npcs = characters.filter((c) => c.kind === "npc");
+  const { master, pcs, npcs } = splitByKind(characters);
 
   if (!master || pcs.length === 0) {
     return (
@@ -334,17 +327,11 @@ function ParticipantToggle({
           </span>
         )}
       </span>
-      <span className="relative">
-        <CharacterAvatar character={character} className="size-16" />
-        <span
-          className="absolute right-0 bottom-0 size-3 rounded-full ring-2 ring-card"
-          style={{ background: characterColor(character) }}
-        />
-      </span>
+      <CharacterAvatar character={character} showColor className="size-16" />
       <span className="w-full min-w-0">
         <span className="block truncate text-sm font-medium">{character.name}</span>
         <span className="block truncate text-xs text-muted-foreground">
-          {character.kind === "master" ? "Master" : raceLabel(character.raceId, character.gender)}
+          {characterSubtitle(character)}
         </span>
       </span>
     </button>

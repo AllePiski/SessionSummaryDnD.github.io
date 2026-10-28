@@ -2,6 +2,7 @@ import fixWebmDuration from "fix-webm-duration";
 import { db } from "./db";
 import { nextColorSlot } from "./colors";
 import { TIMESLICE_MS } from "./recording-engine";
+import { SETTING_DICE } from "./settings";
 import { sameSpeakers, uid } from "./format";
 import type { Character, CharacterKind, Gender, Session, TranscriptLine } from "./types";
 
@@ -117,7 +118,7 @@ export async function deleteParty({ withSessions }: { withSessions: boolean }) {
         characters.filter((c) => used.has(c.id) && !c.archived).map((c) => db.characters.update(c.id, { archived: true })),
       );
     }
-    await db.settings.delete("dice");
+    await db.settings.delete(SETTING_DICE);
   });
 }
 
@@ -258,11 +259,6 @@ export async function requestPersistentStorage() {
   } catch {
     // non supportato: nessun problema
   }
-}
-
-export async function getSetting<T>(key: string, fallback: T): Promise<T> {
-  const row = await db.settings.get(key);
-  return row ? (row.value as T) : fallback;
 }
 
 export async function setSetting(key: string, value: unknown) {

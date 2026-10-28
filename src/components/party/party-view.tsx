@@ -21,8 +21,7 @@ import { CharacterDialog } from "@/components/characters/character-dialog";
 import { PageHeader, PageLoading } from "@/components/page-header";
 import { PartyWizard } from "./party-wizard";
 import { useCharacters, useRecording, useSessions } from "@/hooks/use-data";
-import { characterColor } from "@/lib/colors";
-import { raceLabel } from "@/lib/races";
+import { characterSubtitle, splitByKind } from "@/lib/characters";
 import { deleteParty, removeCharacter } from "@/lib/repo";
 import type { Character } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -38,9 +37,7 @@ export function PartyView() {
 
   if (characters === undefined) return <PageLoading />;
 
-  const master = characters.find((c) => c.kind === "master");
-  const pcs = characters.filter((c) => c.kind === "pc");
-  const npcs = characters.filter((c) => c.kind === "npc");
+  const { master, pcs, npcs } = splitByKind(characters);
 
   if (pcs.length === 0) return <PartyWizard existingMaster={master} />;
 
@@ -239,25 +236,15 @@ function CharacterCard({
   onDelete?: () => void;
 }) {
   const isMaster = character.kind === "master";
-  const subtitle = isMaster
-    ? "Master"
-    : [raceLabel(character.raceId, character.gender), character.className].filter(Boolean).join(" · ");
   return (
     <Card className={cn("flex-row items-center gap-4 px-4", compact ? "py-3" : "py-5", isMaster && "ring-primary/35")}>
-      <div className="relative">
-        <CharacterAvatar character={character} className={compact ? "size-12" : "size-20"} />
-        <span
-          className="absolute right-0 bottom-0 size-3.5 rounded-full ring-3 ring-card"
-          style={{ background: characterColor(character) }}
-          aria-hidden
-        />
-      </div>
+      <CharacterAvatar character={character} showColor className={compact ? "size-12" : "size-20"} />
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-1.5">
           {isMaster && <Crown className="size-4 shrink-0 text-primary" />}
           <h3 className={cn("truncate font-semibold", compact ? "text-sm" : "text-base")}>{character.name}</h3>
         </div>
-        <p className="truncate text-sm text-muted-foreground">{subtitle}</p>
+        <p className="truncate text-sm text-muted-foreground">{characterSubtitle(character, { withClass: true })}</p>
         {!compact && character.playerName && (
           <p className="truncate text-xs text-muted-foreground">Giocato da {character.playerName}</p>
         )}

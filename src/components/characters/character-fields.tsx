@@ -27,7 +27,8 @@ export function CharacterFields({
   className,
 }: {
   value: CharacterDraft;
-  onChange: (value: CharacterDraft) => void;
+  /** riceve un updater: le modifiche asincrone (foto) non sovrascrivono quanto digitato nel frattempo */
+  onChange: (update: (prev: CharacterDraft) => CharacterDraft) => void;
   namePlaceholder?: string;
   showPlayer?: boolean;
   showClass?: boolean;
@@ -44,7 +45,8 @@ export function CharacterFields({
     event.target.value = "";
     if (!file) return;
     try {
-      onChange({ ...value, photo: await fileToAvatarDataUrl(file) });
+      const photo = await fileToAvatarDataUrl(file);
+      onChange((v) => ({ ...v, photo }));
     } catch {
       toast.error("Non riesco a leggere questa immagine. Prova con un JPG o PNG.");
     }
@@ -74,7 +76,7 @@ export function CharacterFields({
               size="icon-xs"
               variant="ghost"
               aria-label="Rimuovi foto"
-              onClick={() => onChange({ ...value, photo: undefined })}
+              onClick={() => onChange((v) => ({ ...v, photo: undefined }))}
             >
               <X />
             </Button>
@@ -92,7 +94,7 @@ export function CharacterFields({
             placeholder={namePlaceholder}
             autoFocus={autoFocus}
             maxLength={60}
-            onChange={(e) => onChange({ ...value, name: e.target.value })}
+            onChange={(e) => onChange((v) => ({ ...v, name: e.target.value }))}
           />
         </div>
         {showPlayer && (
@@ -105,14 +107,20 @@ export function CharacterFields({
               value={value.playerName ?? ""}
               placeholder="Chi lo interpreta"
               maxLength={60}
-              onChange={(e) => onChange({ ...value, playerName: e.target.value })}
+              onChange={(e) => onChange((v) => ({ ...v, playerName: e.target.value }))}
             />
           </div>
         )}
         <div className={cn("grid gap-3", showClass && "sm:grid-cols-2")}>
           <div className="grid gap-1.5">
-            <Label>{value.raceId === MASTER_AVATAR ? "Avatar" : "Razza"}</Label>
-            <Button type="button" variant="outline" className="h-8 justify-between" onClick={() => setPickerOpen(true)}>
+            <Label htmlFor={`${id}-race`}>{value.raceId === MASTER_AVATAR ? "Avatar" : "Razza"}</Label>
+            <Button
+              id={`${id}-race`}
+              type="button"
+              variant="outline"
+              className="h-8 justify-between"
+              onClick={() => setPickerOpen(true)}
+            >
               {raceLabel(value.raceId, value.gender)}
               <Pencil className="text-muted-foreground" />
             </Button>
@@ -122,7 +130,7 @@ export function CharacterFields({
               <Label htmlFor={`${id}-class`}>Classe</Label>
               <Select
                 value={value.className || NO_CLASS}
-                onValueChange={(v) => onChange({ ...value, className: v === NO_CLASS ? undefined : v })}
+                onValueChange={(choice) => onChange((v) => ({ ...v, className: choice === NO_CLASS ? undefined : choice }))}
               >
                 <SelectTrigger id={`${id}-class`} className="w-full">
                   <SelectValue />
@@ -147,7 +155,7 @@ export function CharacterFields({
         raceId={value.raceId}
         gender={value.gender}
         allowMaster={allowMasterAvatar}
-        onSelect={(raceId, gender) => onChange({ ...value, raceId, gender })}
+        onSelect={(raceId, gender) => onChange((v) => ({ ...v, raceId, gender }))}
       />
     </div>
   );
